@@ -1,13 +1,5 @@
 # @devdigest/api
 
-## Curated sources (search here first)
-
-- [docs/](docs/) — detailed documentation
-- [specs/](specs/) — behavioral specifications
-- [INSIGHTS.md](INSIGHTS.md) — non-obvious decisions and traps
-- [README.md](README.md) — narrative overview (API map, DI flow, env vars)
-- [src/modules/repo-intel/README.md](src/modules/repo-intel/README.md) — repo-intel pipeline and facade
-
 ## Tech stack
 
 Fastify 5, Drizzle ORM, PostgreSQL 16 + pgvector, Zod (validation + type provider),
@@ -24,36 +16,6 @@ pnpm typecheck
 pnpm db:migrate       # NOT applied on boot
 pnpm db:seed          # idempotent demo data
 pnpm db:generate      # generate migration after schema change
-```
-
-## Map
-
-```
-src/
-  server.ts              entrypoint
-  app.ts                 buildApp() — Fastify factory, exported for test inject()
-  platform/
-    config.ts            env validation (Zod). Secrets are NOT here.
-    container.ts         DI — lazy getters, ContainerOverrides for test mocks
-    jobs.ts              async queue (p-queue)
-    sse.ts               RunBus — in-memory SSE pub/sub with buffer replay
-    errors.ts            AppError base class
-  modules/
-    index.ts             static module registry (add new modules here)
-    repos/               add/list/refresh/delete GitHub repositories
-    pulls/               PR list, detail, comments
-    reviews/             run AI reviews, SSE streaming, findings accept/dismiss
-    agents/              CRUD for review agents
-    repo-intel/          codebase indexer (symbols, import graph, PageRank, repo map)
-    settings/            app settings, API key management
-    workspace/           workspace/team
-    polling/             background PR sync
-  adapters/              git, github, llm, codeindex, astgrep, depgraph, secrets, embedder
-  db/
-    schema/              Drizzle table definitions (one file per domain)
-    migrate.ts           migration runner
-    seed.ts              demo data seeder
-  vendor/shared/         @devdigest/shared — Zod contracts (extend-only)
 ```
 
 ## Conventions

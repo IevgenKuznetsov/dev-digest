@@ -4,7 +4,7 @@ AI-powered local-first PR review studio.
 
 ## How to search for answers
 
-Before exploring the codebase, always check the relevant package's curated sources first:
+Always check the relevant package's curated sources before giving user an answer:
 1. `<package>/CLAUDE.md` — rules, map, conventions, gotchas
 2. `<package>/docs/` — detailed documentation
 3. `<package>/specs/` — behavioral specifications
