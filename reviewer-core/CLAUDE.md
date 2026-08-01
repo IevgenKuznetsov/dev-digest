@@ -2,6 +2,14 @@
 
 Pure review engine. No DB, no GitHub, no filesystem. Only side effect: injected LLMProvider.
 
+## Curated sources (search here first)
+
+- [docs/](docs/) — detailed documentation
+- [specs/](specs/) — behavioral specifications
+- [INSIGHTS.md](INSIGHTS.md) — non-obvious decisions and traps
+- [README.md](README.md) — narrative overview (pipeline diagram, public API)
+- [../docs/agent-prompts/](../docs/agent-prompts/) — prompt authoring guide and canonical agent prompts
+
 ## Tech stack
 
 Zod (structured output schema), OpenAI SDK (OpenRouter provider). Zero other runtime deps.
@@ -11,6 +19,23 @@ Zod (structured output schema), OpenAI SDK (OpenRouter provider). Zero other run
 ```sh
 npm test          # vitest — stubbed LLM, no keys, no network
 npm run typecheck # this IS the build (never emits JS)
+```
+
+## Map
+
+```
+src/
+  index.ts               public API — all exports go through here
+  prompt.ts              prompt assembly + INJECTION_GUARD + wrapUntrusted()
+  grounding.ts           citation grounding gate (drop hallucinated line refs)
+  review/
+    run.ts               reviewPullRequest() — the engine entry point
+    reduce.ts            map-reduce merge, scoreFromFindings()
+  llm/
+    openrouter.ts        OpenAI-compatible provider with session grouping
+    structured.ts        Zod → JSON Schema, parse-with-repair loop
+  output/
+    to-review.ts         Review → GitHub review payload (body + inline comments)
 ```
 
 ## Conventions

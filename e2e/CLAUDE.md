@@ -2,6 +2,13 @@
 
 Deterministic browser e2e using agent-browser CLI. No Playwright, no LLM, no API key.
 
+## Curated sources (search here first)
+
+- [docs/](docs/) — detailed documentation
+- [specs/](specs/) — behavioral specifications
+- [INSIGHTS.md](INSIGHTS.md) — non-obvious decisions and traps
+- [README.md](README.md) — narrative overview (flow format, running locally, coverage)
+
 ## Tech stack
 
 agent-browser (Rust + CDP), TypeScript runner. No test framework — exit codes are assertions.
@@ -14,6 +21,15 @@ agent-browser (Rust + CDP), TypeScript runner. No test framework — exit codes 
 
 # Against running dev stack (only if DB has ONLY seeded data):
 cd e2e && npm test
+```
+
+## Map
+
+```
+specs/               JSON flow files (NN-name.flow.json)
+run.ts               runner — iterates specs, shells out to agent-browser
+lib/                 runner helpers
+test-results/        failure screenshots (git-ignored, CI artifact)
 ```
 
 ## Conventions
