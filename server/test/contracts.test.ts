@@ -15,6 +15,9 @@ import {
   Settings,
   Repo,
   PrDetail,
+  RunSummaryCost,
+  RunStatsCost,
+  PrMetaCost,
 } from '@devdigest/shared';
 
 /**
@@ -166,6 +169,97 @@ describe('AI contracts parse fixtures', () => {
       log: [{ t: '00.00', kind: 'info', msg: 'started' }],
     });
     expect(trace.tool_calls).toHaveLength(1);
+  });
+});
+
+describe('run-cost contracts', () => {
+  it('RunSummaryCost extends RunSummary with cost_usd', () => {
+    const parsed = RunSummaryCost.parse({
+      run_id: 'r1',
+      agent_id: 'a1',
+      agent_name: 'Security Reviewer',
+      provider: 'openrouter',
+      model: 'deepseek/deepseek-v4-flash',
+      status: 'done',
+      error: null,
+      duration_ms: 8200,
+      tokens_in: 9119,
+      tokens_out: 1200,
+      cost_usd: 0.0013,
+      findings_count: 3,
+      grounding: '3/3 passed',
+      ran_at: '2026-06-01T08:52:51.000Z',
+      score: 38,
+      blockers: 2,
+    });
+    expect(parsed.cost_usd).toBe(0.0013);
+    expect(parsed.tokens_in).toBe(9119);
+  });
+
+  it('RunSummaryCost accepts missing cost_usd (nullish)', () => {
+    const parsed = RunSummaryCost.parse({
+      run_id: 'r1',
+      agent_id: null,
+      agent_name: null,
+      provider: null,
+      model: null,
+      status: 'failed',
+      error: 'quota exceeded',
+      duration_ms: null,
+      tokens_in: null,
+      tokens_out: null,
+      findings_count: null,
+      grounding: null,
+      ran_at: null,
+      score: null,
+      blockers: null,
+    });
+    expect(parsed.cost_usd).toBeUndefined();
+  });
+
+  it('RunStatsCost extends RunStats with cost_usd', () => {
+    const parsed = RunStatsCost.parse({
+      duration_ms: 8200,
+      tokens_in: 14820,
+      tokens_out: 1240,
+      cost_usd: 0.06,
+      findings: 3,
+      grounding: '3/3 passed',
+    });
+    expect(parsed.cost_usd).toBe(0.06);
+  });
+
+  it('PrMetaCost extends PrMeta with latest_cost_usd', () => {
+    const parsed = PrMetaCost.parse({
+      number: 482,
+      title: 'Add rate limiting',
+      author: 'marisa.koch',
+      branch: 'feat/rate-limit',
+      base: 'main',
+      head_sha: 'abc123',
+      additions: 247,
+      deletions: 33,
+      files_count: 9,
+      status: 'needs_review',
+      latest_cost_usd: 0.0013,
+    });
+    expect(parsed.latest_cost_usd).toBe(0.0013);
+  });
+
+  it('PrMetaCost accepts missing latest_cost_usd (nullish)', () => {
+    const parsed = PrMetaCost.parse({
+      number: 482,
+      title: 'Add rate limiting',
+      author: 'marisa.koch',
+      branch: 'feat/rate-limit',
+      base: 'main',
+      head_sha: 'abc123',
+      additions: 247,
+      deletions: 33,
+      files_count: 9,
+      status: 'needs_review',
+    });
+    expect(parsed.latest_cost_usd).toBeUndefined();
   });
 });
 

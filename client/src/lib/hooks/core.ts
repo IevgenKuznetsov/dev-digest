@@ -13,7 +13,7 @@ import type {
   ConnTestResult,
   SecretsStatus,
   Repo,
-  PrMeta,
+  PrMetaCost,
   PrDetail,
   SpecFile,
   IndexStatus,
@@ -102,7 +102,7 @@ export function useDeleteRepo() {
 export function usePulls(repoId: string | null | undefined) {
   return useQuery({
     queryKey: ["pulls", repoId],
-    queryFn: () => api.get<PrMeta[]>(`/repos/${repoId}/pulls`),
+    queryFn: () => api.get<PrMetaCost[]>(`/repos/${repoId}/pulls`),
     enabled: !!repoId,
     // Auto-refresh PR statuses: re-sync from GitHub every 60s while the page is
     // open, and whenever the window regains focus.

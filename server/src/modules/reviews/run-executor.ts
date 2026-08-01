@@ -1,5 +1,5 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import type { Provider, Review, RunTrace, RunStatsCost, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
@@ -249,9 +249,18 @@ export class ReviewRunExecutor {
         grounding,
         score: outcome.review.score,
         blockers,
+        costUsd: outcome.costUsd,
         error: null,
       });
 
+      const stats: RunStatsCost = {
+        duration_ms: durationMs,
+        tokens_in: tokensIn,
+        tokens_out: tokensOut,
+        cost_usd: outcome.costUsd,
+        findings: findingRows.length,
+        grounding,
+      };
       const trace: RunTrace = {
         config: {
           agent: agent.name,
@@ -261,13 +270,7 @@ export class ReviewRunExecutor {
           pr: pull.number,
           source: 'local',
         },
-        stats: {
-          duration_ms: durationMs,
-          tokens_in: tokensIn,
-          tokens_out: tokensOut,
-          findings: findingRows.length,
-          grounding,
-        },
+        stats,
         prompt_assembly: outcome.assembly,
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
