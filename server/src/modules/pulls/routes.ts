@@ -129,18 +129,21 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest run COST per PR — mirrors the score pattern above. Newest "done"
-    // run's cost_usd wins (first-seen per PR from newest-first rows).
-    const latestCostByPr = new Map<string, number | null>();
+    // Total run COST per PR — sum of cost_usd across all "done" runs for each PR.
+    // A PR review typically involves multiple agents; the list shows the combined cost.
+    const totalCostByPr = new Map<string, number | null>();
     if (prIds.length > 0) {
       const costRows = await container.db
         .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
         .from(t.agentRuns)
-        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
-        .orderBy(desc(t.agentRuns.ranAt));
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
       for (const cr of costRows) {
-        if (cr.prId && !latestCostByPr.has(cr.prId)) {
-          latestCostByPr.set(cr.prId, cr.costUsd);
+        if (!cr.prId) continue;
+        const prev = totalCostByPr.get(cr.prId);
+        if (cr.costUsd != null) {
+          totalCostByPr.set(cr.prId, (prev ?? 0) + cr.costUsd);
+        } else if (!totalCostByPr.has(cr.prId)) {
+          totalCostByPr.set(cr.prId, null);
         }
       }
     }
@@ -169,7 +172,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
-        latest_cost_usd: latestCostByPr.get(r.id) ?? null,
+        latest_cost_usd: totalCostByPr.get(r.id) ?? null,
       };
     });
   });

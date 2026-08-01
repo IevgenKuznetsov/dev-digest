@@ -30,8 +30,9 @@ Each `RunSummaryCost` object includes `cost_usd: number | null`.
 ### `GET /repos/:id/pulls` — PR list
 
 Each `PrMetaCost` object includes `latest_cost_usd: number | null` —
-the `cost_usd` of the most recent `done` run for that PR.
-`NULL` when no completed runs exist.
+the **sum** of `cost_usd` across all `done` runs for that PR
+(a review typically involves multiple agents). `NULL` when no completed runs exist
+or all runs have `NULL` cost.
 
 ### `RunTrace.stats`
 
