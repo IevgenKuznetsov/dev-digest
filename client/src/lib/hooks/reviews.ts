@@ -12,7 +12,7 @@ import type {
   ReviewRecord,
   ReviewRunResponse,
   RunEvent,
-  RunSummary,
+  RunSummaryCost,
 } from "@devdigest/shared";
 
 // ---- Active (in-flight) runs — server-side source of truth ----
@@ -40,7 +40,7 @@ export function usePrActiveRuns(prId: string | null | undefined) {
 export function usePrRuns(prId: string | null | undefined) {
   return useQuery({
     queryKey: ["pr-runs", prId],
-    queryFn: () => api.get<RunSummary[]>(`/pulls/${prId}/runs`),
+    queryFn: () => api.get<RunSummaryCost[]>(`/pulls/${prId}/runs`),
     enabled: !!prId,
     refetchInterval: (query) =>
       (query.state.data ?? []).some((r) => r.status === "running") ? 4000 : false,

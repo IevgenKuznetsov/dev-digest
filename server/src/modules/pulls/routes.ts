@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
+import type { PrMetaCost, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
@@ -23,7 +23,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
 
-  app.get('/repos/:id/pulls', { schema: { params: IdParams } }, async (req): Promise<PrMeta[]> => {
+  app.get('/repos/:id/pulls', { schema: { params: IdParams } }, async (req): Promise<PrMetaCost[]> => {
     const { workspaceId } = await getContext(container, req);
     const [repo] = await container.db
       .select()
@@ -129,6 +129,22 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Latest run COST per PR — mirrors the score pattern above. Newest "done"
+    // run's cost_usd wins (first-seen per PR from newest-first rows).
+    const latestCostByPr = new Map<string, number | null>();
+    if (prIds.length > 0) {
+      const costRows = await container.db
+        .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
+        .from(t.agentRuns)
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
+        .orderBy(desc(t.agentRuns.ranAt));
+      for (const cr of costRows) {
+        if (cr.prId && !latestCostByPr.has(cr.prId)) {
+          latestCostByPr.set(cr.prId, cr.costUsd);
+        }
+      }
+    }
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
@@ -153,6 +169,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        latest_cost_usd: latestCostByPr.get(r.id) ?? null,
       };
     });
   });

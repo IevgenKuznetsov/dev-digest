@@ -3,7 +3,8 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import type { RunSummaryCost, PrCommit } from "@devdigest/shared";
+import { formatCost, formatTotalTokens } from "../RunTraceDrawer/helpers";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -19,7 +20,7 @@ import type { RunSummary, PrCommit } from "@devdigest/shared";
 
 type Outcome = { key: string; color: string; bg: string; icon: IconName };
 
-function outcomeOf(run: RunSummary): Outcome {
+function outcomeOf(run: RunSummaryCost): Outcome {
   const status = run.status ?? "";
   if (status === "running")
     return { key: "running", color: "var(--accent)", bg: "var(--accent-bg)", icon: "RefreshCw" };
@@ -74,7 +75,7 @@ const commitRowStyle: React.CSSProperties = {
 };
 
 type TimelineItem =
-  | { kind: "run"; ts: number; run: RunSummary }
+  | { kind: "run"; ts: number; run: RunSummaryCost }
   | { kind: "commit"; ts: number; commit: PrCommit };
 
 /** Epoch ms for sorting; unparseable / missing timestamps sort last. */
@@ -91,7 +92,7 @@ export function RunHistory({
   onGoToReview,
   onDelete,
 }: {
-  runs: RunSummary[];
+  runs: RunSummaryCost[];
   commits?: PrCommit[];
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
@@ -195,8 +196,14 @@ export function RunHistory({
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
+              {settled && (r.tokens_in != null || r.tokens_out != null) && (
+                <span>
+                  {formatTotalTokens(r.tokens_in ?? 0, r.tokens_out ?? 0)}
+                  {r.cost_usd != null ? ` · ${formatCost(r.cost_usd)}` : ""}
+                </span>
+              )}
             </div>
             <button
               type="button"
