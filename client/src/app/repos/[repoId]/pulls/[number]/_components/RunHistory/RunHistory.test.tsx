@@ -7,13 +7,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { RunSummaryCost } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
 
 afterEach(cleanup);
 
-function run(o: Partial<RunSummary>): RunSummary {
+function run(o: Partial<RunSummaryCost>): RunSummaryCost {
   return {
     run_id: "run-1",
     agent_id: "a1",
@@ -25,6 +25,7 @@ function run(o: Partial<RunSummary>): RunSummary {
     duration_ms: 1000,
     tokens_in: 100,
     tokens_out: 50,
+    cost_usd: null,
     findings_count: 0,
     grounding: "0/0 passed",
     ran_at: "2026-06-11T18:44:34.000Z",
@@ -34,7 +35,7 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function renderRuns(runs: RunSummaryCost[]) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
       <RunHistory runs={runs} onOpenTrace={() => {}} />
@@ -71,5 +72,24 @@ describe("RunHistory — outcome badge", () => {
   it("a running run reads 'running'", () => {
     renderRuns([run({ status: "running", score: null, blockers: null })]);
     expect(screen.getByText("running")).toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — token + cost display", () => {
+  it("shows token count and cost for a settled run with cost_usd", () => {
+    renderRuns([run({ tokens_in: 9000, tokens_out: 119, cost_usd: 0.0013 })]);
+    expect(screen.getByText(/tok/)).toBeInTheDocument();
+    expect(screen.getByText(/\$0\.0013/)).toBeInTheDocument();
+  });
+
+  it("shows token count without cost when cost_usd is null", () => {
+    renderRuns([run({ tokens_in: 5000, tokens_out: 200, cost_usd: null })]);
+    expect(screen.getByText(/tok/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
+  });
+
+  it("does not show tokens for a failed run", () => {
+    renderRuns([run({ status: "failed", error: "boom", tokens_in: 0, tokens_out: 0, cost_usd: null })]);
+    expect(screen.queryByText(/tok/)).not.toBeInTheDocument();
   });
 });

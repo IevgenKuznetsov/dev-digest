@@ -1,6 +1,6 @@
 ---
 name: engineering-insight
-description: "Proactively captures non-obvious engineering insights to package INSIGHTS.md files during any session. Activates when the agent discovers surprising behavior, a subtle bug pattern, a non-documented constraint, a performance cliff, or an architectural decision with hidden rationale. Does NOT wait for the user to ask. Does NOT record anything obvious from reading the code or already documented in CLAUDE.md/docs/specs. Covers server/, client/, reviewer-core/, and e2e/ packages."
+description: "Proactively captures non-obvious engineering insights to package INSIGHTS.md files during any session. TRIGGER: automatically invoke this skill after completing any multi-file feature, bug fix spanning 3+ files, migration, or task that involved debugging surprising behavior. Also activates mid-session when the agent discovers surprising behavior, a subtle bug pattern, a non-documented constraint, a performance cliff, or an architectural decision with hidden rationale. Does NOT wait for the user to ask. Does NOT record anything obvious from reading the code or already documented in CLAUDE.md/docs/specs. Covers server/, client/, reviewer-core/, and e2e/ packages."
 ---
 
 # Engineering Insight Capture
