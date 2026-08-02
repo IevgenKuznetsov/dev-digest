@@ -4,14 +4,22 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
-import type { PrMetaCost } from "@/lib/types";
+import { Icon, Avatar, Badge, CircularScore, SeverityBadge, Tooltip, type Severity } from "@devdigest/ui";
+import type { PrMetaFindings } from "@/lib/types";
+import type { Severity as SharedSeverity } from "@devdigest/shared";
+import { FindingsTooltipContent } from "../../[number]/_components/RunHistory/FindingsTooltipContent";
 import { formatCost } from "../../[number]/_components/RunTraceDrawer/helpers";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
 import { s } from "../../styles";
 
-export function PRRow({ pr, repoId }: { pr: PrMetaCost; repoId: string }) {
+const SEV_KEYS: { key: "critical_count" | "warning_count" | "suggestion_count"; sev: Severity }[] = [
+  { key: "critical_count", sev: "CRITICAL" },
+  { key: "warning_count", sev: "WARNING" },
+  { key: "suggestion_count", sev: "SUGGESTION" },
+];
+
+export function PRRow({ pr, repoId }: { pr: PrMetaFindings; repoId: string }) {
   const t = useTranslations("prReview");
   const router = useRouter();
   const [h, setH] = React.useState(false);
@@ -53,6 +61,28 @@ export function PRRow({ pr, repoId }: { pr: PrMetaCost; repoId: string }) {
         ) : (
           <span style={s.muted}>—</span>
         )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {SEV_KEYS.map(({ key, sev }) => {
+          const n = pr[key];
+          if (n == null || n <= 0) return null;
+          const filtered = (pr.findings_preview ?? []).filter(
+            (f) => f.severity === sev,
+          );
+          return filtered.length > 0 ? (
+            <Tooltip
+              key={sev}
+              trigger={<SeverityBadge severity={sev} count={n} compact />}
+            >
+              <FindingsTooltipContent
+                findings={filtered}
+                severity={sev as SharedSeverity}
+              />
+            </Tooltip>
+          ) : (
+            <SeverityBadge key={sev} severity={sev} count={n} compact />
+          );
+        })}
       </div>
       <div style={{ fontSize: 13, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
         {formatCost(pr.latest_cost_usd)}

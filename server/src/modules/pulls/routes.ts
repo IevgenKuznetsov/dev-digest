@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { PrMetaCost, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
+import type { PrMetaFindings, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
@@ -23,7 +23,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
 
-  app.get('/repos/:id/pulls', { schema: { params: IdParams } }, async (req): Promise<PrMetaCost[]> => {
+  app.get('/repos/:id/pulls', { schema: { params: IdParams } }, async (req): Promise<PrMetaFindings[]> => {
     const { workspaceId } = await getContext(container, req);
     const [repo] = await container.db
       .select()
@@ -148,9 +148,89 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Per-severity FINDING COUNTS + preview per PR — aggregated from the
+    // findings table through reviews. The preview array feeds hover tooltips
+    // on the PR list page.
+    interface PrFindingsAgg {
+      critical: number;
+      warning: number;
+      suggestion: number;
+      findings: {
+        id: string;
+        review_id: string;
+        severity: string;
+        category: string;
+        title: string;
+        file: string;
+        start_line: number;
+        end_line: number;
+        rationale: string;
+        suggestion: string | null;
+        confidence: number;
+        kind: string;
+        trifecta_components: string[] | null;
+        accepted_at: string | null;
+        dismissed_at: string | null;
+      }[];
+    }
+    const sevCountsByPr = new Map<string, PrFindingsAgg>();
+    if (prIds.length > 0) {
+      const findingRows = await container.db
+        .select({
+          prId: t.reviews.prId,
+          id: t.findings.id,
+          reviewId: t.findings.reviewId,
+          severity: t.findings.severity,
+          category: t.findings.category,
+          title: t.findings.title,
+          file: t.findings.file,
+          startLine: t.findings.startLine,
+          endLine: t.findings.endLine,
+          rationale: t.findings.rationale,
+          suggestion: t.findings.suggestion,
+          confidence: t.findings.confidence,
+          kind: t.findings.kind,
+          trifectaComponents: t.findings.trifectaComponents,
+          acceptedAt: t.findings.acceptedAt,
+          dismissedAt: t.findings.dismissedAt,
+        })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+        .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')));
+      for (const fr of findingRows) {
+        if (!fr.prId) continue;
+        let agg = sevCountsByPr.get(fr.prId);
+        if (!agg) {
+          agg = { critical: 0, warning: 0, suggestion: 0, findings: [] };
+          sevCountsByPr.set(fr.prId, agg);
+        }
+        if (fr.severity === 'CRITICAL') agg.critical++;
+        else if (fr.severity === 'WARNING') agg.warning++;
+        else if (fr.severity === 'SUGGESTION') agg.suggestion++;
+        agg.findings.push({
+          id: fr.id,
+          review_id: fr.reviewId,
+          severity: fr.severity,
+          category: fr.category,
+          title: fr.title,
+          file: fr.file,
+          start_line: fr.startLine,
+          end_line: fr.endLine,
+          rationale: fr.rationale,
+          suggestion: fr.suggestion,
+          confidence: fr.confidence,
+          kind: fr.kind,
+          trifecta_components: fr.trifectaComponents,
+          accepted_at: fr.acceptedAt?.toISOString() ?? null,
+          dismissed_at: fr.dismissedAt?.toISOString() ?? null,
+        });
+      }
+    }
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
+      const sev = sevCountsByPr.get(r.id);
       return {
         id: r.id,
         number: r.number,
@@ -173,6 +253,10 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         latest_cost_usd: totalCostByPr.get(r.id) ?? null,
+        critical_count: sev ? sev.critical : null,
+        warning_count: sev ? sev.warning : null,
+        suggestion_count: sev ? sev.suggestion : null,
+        findings_preview: sev ? sev.findings : null,
       };
     });
   });
