@@ -56,6 +56,12 @@ Compact `SeverityBadge` for each non-zero severity count, using
 `critical_count`, `warning_count`, `suggestion_count` from the
 `PrMetaFindings` API response.
 
+### Data Source
+
+Server-side: the `GET /repos/:id/pulls` endpoint returns `PrMetaFindings`
+with `critical_count`, `warning_count`, `suggestion_count` (for badge
+rendering) and `findings_preview: FindingRecord[]` (for tooltip content).
+
 ### Edge Cases
 
 | Condition                  | Behavior                    |
@@ -63,14 +69,13 @@ Compact `SeverityBadge` for each non-zero severity count, using
 | PR never reviewed          | No badges (column empty)    |
 | All counts are 0           | No badges (column empty)    |
 | Counts are `null`          | No badges (column empty)    |
+| `findings_preview` is null | Badges shown without tooltip|
 
-No tooltip on the PR list (full finding data is not available here).
-
-## Hover Tooltip (Timeline only)
+## Hover Tooltip (PR List + Timeline)
 
 ### Trigger
 
-- Hover over any severity counter badge on a timeline run row
+- Hover over any severity counter badge on a timeline run row or PR list row
 - 150 ms enter delay, 100 ms leave delay
 - Mouse enter shows tooltip; mouse leave hides it
 

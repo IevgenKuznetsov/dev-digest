@@ -2,8 +2,10 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummaryCost, PrCommit } from "@devdigest/shared";
+import { Badge, Icon, CircularScore, SeverityBadge, Tooltip, type IconName } from "@devdigest/ui";
+import type { RunSummaryCost, PrCommit, ReviewRecord, Severity } from "@devdigest/shared";
+import { findingsForRun } from "./severity-counts";
+import { FindingsTooltipContent } from "./FindingsTooltipContent";
 import { formatCost, formatTotalTokens } from "../RunTraceDrawer/helpers";
 
 /**
@@ -85,15 +87,20 @@ function tsOf(s: string | null | undefined): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+const SEVERITY_ORDER: Severity[] = ["CRITICAL", "WARNING", "SUGGESTION"];
+
 export function RunHistory({
   runs,
   commits = [],
+  reviews,
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummaryCost[];
   commits?: PrCommit[];
+  /** Reviews with full findings — used for per-severity counter badges. */
+  reviews?: ReviewRecord[];
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -189,12 +196,31 @@ export function RunHistory({
                   {r.error}
                 </div>
               )}
-              {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
-                  {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
-                </div>
-              )}
+              {settled && (() => {
+                if (reviews) {
+                  const counts = findingsForRun(r.run_id, reviews);
+                  const badges = SEVERITY_ORDER.filter((s) => counts[s].length > 0);
+                  if (badges.length === 0) return null;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {badges.map((sev) => (
+                        <Tooltip
+                          key={sev}
+                          trigger={<SeverityBadge severity={sev} count={counts[sev].length} compact />}
+                        >
+                          <FindingsTooltipContent findings={counts[sev]} severity={sev} />
+                        </Tooltip>
+                      ))}
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                    {t("runStatus.findings", { count: r.findings_count ?? 0 })}
+                    {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
+                  </div>
+                );
+              })()}
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
