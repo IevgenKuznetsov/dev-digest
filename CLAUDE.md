@@ -69,6 +69,11 @@ cd reviewer-core && npm test    # engine tests (no keys, no network)
 - Grounding gate in `reviewer-core/src/grounding.ts` — mandatory mechanical filter;
   score is recomputed from grounded findings, model's self-reported score is ignored.
 
+## Post-refactoring checklist
+
+After completing any task that modifies 3+ files, invoke `/engineering-insight`
+before summarizing results to the user. This is not optional.
+
 ## Testing
 
 Strategy in TESTING.md. Five CI workflows, path-filtered per package.
