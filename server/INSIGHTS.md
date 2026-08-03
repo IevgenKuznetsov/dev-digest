@@ -1,6 +1,7 @@
 # Insights
 
-> Draft — entries are under human review. Last updated: 2026-08-01.
+> Draft — entries are under human review. Last updated: 2026-08-03.
 
 - `2026-08-01` **Recurring Errors & Fixes:** On Windows, `import.meta.url === \`file://${process.argv[1]}\`` never matches (forward slashes vs backslashes, triple vs double slash) — CLI entrypoints silently skip execution with no error. Fix: use `pathToFileURL(resolve(process.argv[1])).href` instead — `server/src/db/migrate.ts:37`, `server/src/db/seed.ts:227`
 - `2026-08-01` **What Doesn't Work:** Extending a vendor/shared Zod schema with `.nullable()` (e.g. `RunSummary.extend({ cost_usd: z.number().nullable() })`) makes the field **required** in the object — every existing consumer constructing the base type without it fails typecheck. Use `.nullish()` instead for backward-compatible optional+nullable fields — `server/src/vendor/shared/contracts/run-cost.ts`
+- `2026-08-03` **Recurring Errors & Fixes:** Extracting route handler bodies into service classes with explicit return types (e.g. `Promise<PrMetaFindings[]>`) surfaces a cascade of `string` vs Zod literal-union mismatches — Drizzle `select()` infers DB columns as `string` / `string[]`, not `Severity | FindingCategory | FindingKind | TrifectaComponent`. Routes hid this because Fastify inferred the return type loosely. Fix: cast each field (`fr.severity as Severity`) or cast the aggregate (`as PrMetaFindings['findings_preview']`) — `server/src/modules/pulls/service.ts:196-206`
