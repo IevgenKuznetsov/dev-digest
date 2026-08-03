@@ -69,6 +69,11 @@ cd reviewer-core && npm test    # engine tests (no keys, no network)
 - Grounding gate in `reviewer-core/src/grounding.ts` — mandatory mechanical filter;
   score is recomputed from grounded findings, model's self-reported score is ignored.
 
+## Post-commit review gate
+
+After every `git commit`, invoke `/pr-self-review` to analyze the committed diff.
+This is not optional. If any CRITICAL issue is found, the merge is blocked until resolved.
+
 ## Post-refactoring checklist
 
 After completing any task that modifies 3+ files, invoke `/engineering-insight`
