@@ -1,0 +1,66 @@
+import type { CSSProperties } from "react";
+
+export const s = {
+  info: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: "12px 16px",
+    borderRadius: 8,
+    background: "var(--bg-surface)",
+    border: "1px solid var(--accent)",
+    fontSize: 13,
+    color: "var(--text-secondary)",
+    marginBottom: 20,
+    lineHeight: 1.5,
+  } as CSSProperties,
+  infoAccent: {
+    fontWeight: 600,
+    color: "var(--accent)",
+  } as CSSProperties,
+  fieldGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+    marginBottom: 20,
+  } as CSSProperties,
+  row: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+  } as CSSProperties,
+  bodyLabel: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    marginBottom: 8,
+  } as CSSProperties,
+  bodyFilename: {
+    fontFamily: "var(--font-mono)",
+    fontSize: 12,
+    color: "var(--text-muted)",
+    background: "var(--bg-surface)",
+    padding: "4px 8px",
+    borderRadius: 4,
+    display: "inline-block",
+    marginBottom: 8,
+  } as CSSProperties,
+  bodyPreview: {
+    fontFamily: "var(--font-mono)",
+    fontSize: 12,
+    lineHeight: 1.6,
+    color: "var(--text-secondary)",
+    background: "var(--bg-surface)",
+    borderRadius: 6,
+    padding: "14px 16px",
+    maxHeight: 300,
+    overflowY: "auto",
+    whiteSpace: "pre-wrap",
+    border: "1px solid var(--border)",
+  } as CSSProperties,
+  footer: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: 10,
+  } as CSSProperties,
+} as const;
