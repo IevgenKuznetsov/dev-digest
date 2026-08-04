@@ -55,6 +55,46 @@ Body: `{ name?, description?, type?, body?, enabled? }`
 
 Cascades to `skill_versions` and `agent_skills` links. Returns `204`.
 
+### `GET /skills/:id/versions` — Version history
+
+Returns `SkillVersion[]` ordered by `version` descending. Each entry:
+
+| Field | Type |
+|-------|------|
+| `skillId` | uuid |
+| `version` | integer |
+| `body` | text |
+| `createdAt` | timestamp |
+
+404 if skill not found or wrong workspace.
+
+### `POST /skills/:id/versions/:ver/restore` — Restore a past version
+
+Params: `id` (uuid), `ver` (positive integer).
+
+- Reads the body from the target version snapshot.
+- Calls `update(workspaceId, id, { body })` — which bumps `version` and creates a new snapshot.
+- Returns the updated `Skill`. 404 if skill or version not found.
+
+### `GET /skills/:id/eval-cases` — Eval cases for a skill
+
+Returns eval cases where `owner_kind = 'skill'` and `owner_id = :id`.
+
+Each entry: `{ id, name, notes }`.
+
+404 if skill not found or wrong workspace.
+
+### `GET /skills/:id/stats` — Skill usage statistics
+
+Returns:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `used_by_agents` | `Array<{ id, name }>` | Agents linked via `agent_skills` |
+| `agents_count` | integer | Length of `used_by_agents` |
+
+404 if skill not found or wrong workspace.
+
 ### `POST /skills/import/preview` — Preview an import
 
 Body: `{ body: string, name?: string }`

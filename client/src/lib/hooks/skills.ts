@@ -142,6 +142,10 @@ export function useSkillEvalCases(skillId: string | null | undefined) {
 export interface SkillStats {
   used_by_agents: Array<{ id: string; name: string }>;
   agents_count: number;
+  pull_frequency: number | null;
+  accept_rate: number | null;
+  findings_total: number;
+  findings_by_category: Record<string, number>;
 }
 
 export function useSkillStats(skillId: string | null | undefined) {
@@ -149,6 +153,40 @@ export function useSkillStats(skillId: string | null | undefined) {
     queryKey: ["skill-stats", skillId],
     queryFn: () => api.get<SkillStats>(`/skills/${skillId}/stats`),
     enabled: !!skillId,
+  });
+}
+
+// ---- Community search ----
+
+export interface CommunitySkill {
+  name: string;
+  repo: string;
+  stars: number;
+  lang: string;
+  desc: string;
+  body: string;
+}
+
+export function useCommunitySkills(q: string, lang: string) {
+  return useQuery({
+    queryKey: ["community-skills", q, lang],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (lang && lang !== "all") params.set("lang", lang);
+      return api.get<CommunitySkill[]>(`/skills/community/search?${params}`);
+    },
+  });
+}
+
+// ---- Import from URL ----
+
+export function useImportFromUrl() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { url: string; name?: string }) =>
+      api.post<Skill>("/skills/import/url", input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
   });
 }
 

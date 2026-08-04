@@ -6,41 +6,75 @@
 
 Two-panel layout: skill list (left) + preview/editor panel (right).
 
-### Skill List (Left Panel)
+Full-height two-panel layout matching the agent editor pattern
+(`display: flex, height: calc(100vh - 52px)`).
+
+### Skill List (Left Sidebar, 320px)
 
 - Header: "Skills" heading + "Add Skill" dropdown button
 - Search input: filters cards by name (case-insensitive substring match)
-- Grid of `SkillCard` components
+- Scrollable list of `SkillCard` components
 
 #### SkillCard
 
 | Element | Content |
 |---------|---------|
+| Status dot | Green (enabled) or red (disabled) |
 | Name | `skill.name` |
-| Type badge | Color-coded: `rubric` (green), `convention` (blue), `security` (orange), `custom` (gray) |
 | Description | Truncated `skill.description` |
-| Enabled toggle | Calls `PUT /skills/:id` with `{ enabled }` |
+| Type badge | Color-coded: `rubric` (green), `convention` (blue), `security` (orange), `custom` (gray) |
 | Source badge | Only shown for imported/community skills |
 
-- Click card → select it, show in right panel
-- Selected card has highlighted border
+- Click card → select it, show in right panel, reset to Config tab
+- Selected card has accent border + surface background
 
 #### "Add Skill" Dropdown
 
 - "Import from file" → opens import drawer
-- "Import from URL" → opens import drawer on URL tab
 
-### Preview/Editor Panel (Right Panel)
+### Detail Panel (Right)
 
-When no skill selected: placeholder "Select a skill on the left to preview its body."
+When no skill selected: centered placeholder "Select a skill / Pick a skill on the left to preview its body."
 
 When skill selected:
-- Name (editable `TextInput`)
-- Description (editable `Textarea`, hint: "Phrased directively — this is the skill's interface")
-- Type (editable `SelectInput`)
-- Body (editable `Textarea`, markdown, hint: "Saving a changed body creates a new immutable version")
-- Version badge: `v{version}`
-- Save button (disabled when no changes or while saving)
+- **Header bar**: skill name (h1), type badge, version badge (`v{version}`)
+- **Tab bar**: Config | Preview | Evals | Stats | Versions
+
+#### Config Tab
+
+- "Configuration" heading + enabled toggle (right-aligned, with Enabled/Disabled label)
+- Name input (required)
+- Description input
+- Type dropdown
+- "Skill body *" section: filename badge (`{name}.md`), monospace textarea, hint about version creation
+- Save / Delete buttons (save disabled when no changes or while saving)
+
+#### Preview Tab
+
+- "Preview" heading + subtitle "Rendered as the reviewing agent receives it."
+- Skill body rendered as formatted markdown via `<Markdown>` component in a bordered panel
+
+#### Evals Tab
+
+- "Eval cases" heading with count badge + "Run all" and "New eval case" buttons (disabled — eval module pending)
+- Lists eval cases from `GET /skills/:id/eval-cases` (`owner_kind = 'skill'`)
+- Each case: icon, name, notes
+- Empty state when no cases exist
+
+#### Stats Tab
+
+- Stat card: "USED BY" with agents count
+- "AGENTS USING THIS SKILL" list from `GET /skills/:id/stats`
+- Each agent: name
+- Empty message guiding user to link from agent's Skills tab
+
+#### Versions Tab
+
+- "Version history" heading with count badge
+- Subtitle explaining snapshot purpose (eval reproducibility)
+- Version list from `GET /skills/:id/versions` (descending)
+- Each version: version number (`v{N}`), date, "Current" badge for active version
+- Non-current versions have "Restore" button → `POST /skills/:id/versions/:ver/restore` (with confirmation dialog)
 
 ### Import Drawer
 

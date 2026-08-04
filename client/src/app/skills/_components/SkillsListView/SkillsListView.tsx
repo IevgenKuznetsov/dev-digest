@@ -5,7 +5,8 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, Dropdown, EmptyState, ErrorState, Skeleton, Icon, Badge, Toggle, Markdown } from "@devdigest/ui";
+import { Button, Dropdown, EmptyState, ErrorState, Skeleton, Icon, Badge, Toggle, Markdown, Donut } from "@devdigest/ui";
+import { useRouter } from "next/navigation";
 import type { Skill, SkillType } from "@devdigest/shared";
 import { AppShell } from "../../../../components/app-shell";
 import {
@@ -19,6 +20,9 @@ import {
 } from "../../../../lib/hooks/skills";
 import { SkillCard } from "./_components/SkillCard";
 import { ImportDrawer } from "../ImportDrawer";
+import { ImportFromUrlDrawer } from "../ImportFromUrlDrawer";
+import { CommunitySearchDrawer } from "../CommunitySearchDrawer";
+import { CreateFromScratchDrawer } from "../CreateFromScratchDrawer";
 import { s } from "./styles";
 
 const SKILL_TYPES: SkillType[] = ["rubric", "convention", "security", "custom"];
@@ -33,6 +37,9 @@ export function SkillsListView() {
   const [search, setSearch] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [importing, setImporting] = React.useState(false);
+  const [importingUrl, setImportingUrl] = React.useState(false);
+  const [communitySearch, setCommunitySearch] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
   const [tab, setTab] = React.useState<Tab>("config");
 
   const filtered = React.useMemo(() => {
@@ -56,6 +63,9 @@ export function SkillsListView() {
   return (
     <AppShell crumb={crumb}>
       {importing && <ImportDrawer onClose={() => setImporting(false)} />}
+      {importingUrl && <ImportFromUrlDrawer onClose={() => setImportingUrl(false)} />}
+      {communitySearch && <CommunitySearchDrawer onClose={() => setCommunitySearch(false)} />}
+      {creating && <CreateFromScratchDrawer onClose={() => setCreating(false)} />}
       <div style={s.wrap}>
         {/* ---- Left sidebar ---- */}
         <div style={s.sidebar}>
@@ -72,6 +82,10 @@ export function SkillsListView() {
                 }
                 items={[
                   { label: t("page.menu.fromFile"), icon: "Upload", onClick: () => setImporting(true) },
+                  { label: t("page.menu.fromUrl"), icon: "Link", onClick: () => setImportingUrl(true) },
+                  { label: t("page.menu.community"), icon: "Globe", onClick: () => setCommunitySearch(true) },
+                  { divider: true },
+                  { label: "Create from scratch", icon: "Edit", onClick: () => setCreating(true) },
                 ]}
               />
             </div>
@@ -384,8 +398,17 @@ function EvalsTab({ skill }: { skill: Skill }) {
 
 /* ---- Stats Tab ---- */
 
+const CATEGORY_COLORS: Record<string, string> = {
+  security: "#f59e0b",
+  bug: "#ef4444",
+  perf: "#3b82f6",
+  style: "#a855f7",
+  test: "#22c55e",
+};
+
 function StatsTab({ skill }: { skill: Skill }) {
   const { data: stats, isLoading } = useSkillStats(skill.id);
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -397,45 +420,103 @@ function StatsTab({ skill }: { skill: Skill }) {
   }
 
   const agents = stats?.used_by_agents ?? [];
+  const byCat = stats?.findings_by_category ?? {};
+  const donutSegments = Object.entries(byCat).map(([label, value]) => ({
+    label,
+    value,
+    color: CATEGORY_COLORS[label] ?? "#94a3b8",
+  }));
 
   return (
     <div style={s.configPanel}>
       {/* Stat cards row */}
       <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
         <StatCard label="USED BY" value={`${stats?.agents_count ?? 0}`} sub="agents" />
+        <StatCard
+          label="PULL FREQUENCY"
+          value={stats?.pull_frequency != null ? `${stats.pull_frequency}` : "—"}
+          sub="%"
+        />
+        <StatCard
+          label="ACCEPT RATE"
+          value={stats?.accept_rate != null ? `${stats.accept_rate}` : "—"}
+          sub="%"
+        />
+        <StatCard
+          label={`FINDINGS${stats?.findings_total ? ` (${stats.findings_total})` : ""}`}
+          value={`${stats?.findings_total ?? 0}`}
+          sub=""
+        />
       </div>
 
-      {/* Agents using this skill */}
-      <div
-        style={{
-          background: "var(--bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          padding: 16,
-        }}
-      >
-        <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
-          AGENTS USING THIS SKILL
-        </h3>
-        {agents.length === 0 && (
-          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            No agents are using this skill yet. Link it from the agent&apos;s Skills tab.
-          </p>
-        )}
-        {agents.map((a) => (
-          <div
-            key={a.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "8px 0",
-              borderBottom: "1px solid var(--border)",
-              fontSize: 13,
-            }}
-          >
-            <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
-          </div>
-        ))}
+      {/* Bottom two-column layout */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Agents using this skill */}
+        <div
+          style={{
+            background: "var(--bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
+            AGENTS USING THIS SKILL
+          </h3>
+          {agents.length === 0 && (
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              No agents are using this skill yet. Link it from the agent&apos;s Skills tab.
+            </p>
+          )}
+          {agents.map((a) => (
+            <div
+              key={a.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "10px 0",
+                borderBottom: "1px solid var(--border)",
+                fontSize: 13,
+              }}
+            >
+              <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
+              <button
+                onClick={() => router.push(`/agents/${a.id}`)}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "4px 14px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                }}
+              >
+                Open
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Findings by category */}
+        <div
+          style={{
+            background: "var(--bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
+            FINDINGS BY CATEGORY
+          </h3>
+          {donutSegments.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>No findings yet.</p>
+          ) : (
+            <Donut segments={donutSegments} valuePrefix="" />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -457,7 +538,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub: st
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
         <span style={{ fontSize: 28, fontWeight: 700 }}>{value}</span>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{sub}</span>
+        {sub && <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{sub}</span>}
       </div>
     </div>
   );
