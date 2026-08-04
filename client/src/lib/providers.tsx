@@ -8,10 +8,12 @@ import {
   QueryCache,
   MutationCache,
 } from "@tanstack/react-query";
+import { ErrorBoundary } from "react-error-boundary";
 import { ThemeProvider } from "./theme";
 import { RepoProvider } from "./repo-context";
 import { ToastProvider, notify } from "./toast";
 import { ApiError } from "./api";
+import { ErrorState } from "../vendor/ui";
 
 function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -47,7 +49,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={qc}>
       <ThemeProvider>
         <ToastProvider>
-          <RepoProvider>{children}</RepoProvider>
+          <ErrorBoundary
+            fallbackRender={({ resetErrorBoundary }) => (
+              <ErrorState
+                fullScreen
+                title="Something went wrong"
+                body="An unexpected error occurred. Try refreshing the page."
+                onRetry={resetErrorBoundary}
+              />
+            )}
+          >
+            <RepoProvider>{children}</RepoProvider>
+          </ErrorBoundary>
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

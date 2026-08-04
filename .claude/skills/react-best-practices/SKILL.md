@@ -1,6 +1,9 @@
 ---
 name: react-best-practices
 description: "Modern React best practices and anti-pattern catalog (2025-26). Use when writing, reviewing, or refactoring React components, hooks, and state management. Covers component design, state patterns, hooks misuse, performance, data fetching, and code organization."
+metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 1.0.0
 ---
 
 # React Best Practices & Anti-Patterns

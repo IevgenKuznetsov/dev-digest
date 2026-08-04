@@ -4,5 +4,18 @@
       "Bash(pnpm exec:*)",
       "Bash(pnpm test:*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"git commit\"; then echo \"[pr-self-review] Commit detected — invoke /pr-self-review to review the diff.\"; fi'"
+          }
+        ]
+      }
+    ]
   }
 }
