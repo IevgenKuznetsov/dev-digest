@@ -7,6 +7,7 @@ import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
 import { SkillsService } from './service.js';
+import { assertNoInjection, toRawUrl } from './helpers.js';
 import * as t from '../../db/schema.js';
 
 /**
@@ -249,6 +250,7 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     '/skills/import/confirm',
     { schema: { body: ImportConfirmBody } },
     async (req, reply) => {
+      assertNoInjection(req.body.body);
       const { workspaceId } = await getContext(app.container, req);
       const skill = await service.importConfirm(workspaceId, req.body);
       return reply.status(201).send(skill);
@@ -257,15 +259,30 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
 
   // ---- Import from URL ----
 
+  /** Shared helper: fetch URL content with raw-URL normalization. */
+  async function fetchSkillFromUrl(url: string, nameOverride?: string) {
+    const rawUrl = toRawUrl(url);
+    const res = await fetch(rawUrl);
+    if (!res.ok) throw new NotFoundError(`Failed to fetch URL: ${res.status}`);
+    const markdown = await res.text();
+    assertNoInjection(markdown);
+    return service.importPreview(markdown, nameOverride);
+  }
+
+  app.post(
+    '/skills/import/url/preview',
+    { schema: { body: ImportFromUrlBody } },
+    async (req) => {
+      return fetchSkillFromUrl(req.body.url, req.body.name);
+    },
+  );
+
   app.post(
     '/skills/import/url',
     { schema: { body: ImportFromUrlBody } },
     async (req, reply) => {
       const { workspaceId } = await getContext(app.container, req);
-      const res = await fetch(req.body.url);
-      if (!res.ok) throw new NotFoundError(`Failed to fetch URL: ${res.status}`);
-      const markdown = await res.text();
-      const preview = service.importPreview(markdown, req.body.name);
+      const preview = await fetchSkillFromUrl(req.body.url, req.body.name);
       const skill = await service.importConfirm(workspaceId, {
         name: preview.name,
         description: preview.description,

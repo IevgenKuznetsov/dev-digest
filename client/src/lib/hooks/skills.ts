@@ -156,6 +156,15 @@ export function useSkillStats(skillId: string | null | undefined) {
   });
 }
 
+// ---- URL preview ----
+
+export function usePreviewFromUrl() {
+  return useMutation({
+    mutationFn: (input: { url: string; name?: string }) =>
+      api.post<ImportPreview>("/skills/import/url/preview", input),
+  });
+}
+
 // ---- Community search ----
 
 export interface CommunitySkill {

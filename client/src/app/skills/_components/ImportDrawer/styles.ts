@@ -57,5 +57,15 @@ export const s = {
     marginBottom: 16,
     lineHeight: 1.5,
   } satisfies CSSProperties,
+  errorBanner: {
+    padding: "10px 14px",
+    borderRadius: 8,
+    background: "rgba(239,68,68,0.12)",
+    border: "1px solid rgba(239,68,68,0.3)",
+    color: "#ef4444",
+    fontSize: 13,
+    marginBottom: 16,
+    lineHeight: 1.5,
+  } satisfies CSSProperties,
   footer: { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 } satisfies CSSProperties,
 } as const;
