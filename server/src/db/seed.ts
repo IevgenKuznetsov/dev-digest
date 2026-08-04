@@ -9,6 +9,7 @@ import {
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { TEST_QUALITY_REVIEWER_PROMPT } from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -220,6 +221,33 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- Test Quality Reviewer agent ----
+  const tqrName = 'Test Quality Reviewer';
+  const [existingTqr] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, tqrName)));
+  let tqrId: string;
+  if (!existingTqr) {
+    const [tqr] = await db
+      .insert(t.agents)
+      .values({
+        workspaceId,
+        name: tqrName,
+        description: 'Reviews test quality: uncovered branches, missed corner cases, excessive mocking, flakiness.',
+        provider: DEFAULT_PROVIDER,
+        model: DEFAULT_MODEL,
+        systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+        enabled: true,
+        version: 1,
+        createdBy: userId,
+      })
+      .returning();
+    tqrId = tqr!.id;
+  } else {
+    tqrId = existingTqr.id;
   }
 
   return { workspaceId, userId };

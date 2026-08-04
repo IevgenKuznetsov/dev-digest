@@ -10,6 +10,11 @@ vi.mock("../../../../../lib/hooks/agents", () => ({
   useUpdateAgent: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, data: undefined }),
   useProviderModels: () => ({ data: [{ id: "gpt-4.1", provider: "openai" }] }),
 }));
+vi.mock("../../../../../lib/hooks/skills", () => ({
+  useSkills: () => ({ data: [], isLoading: false, isError: false }),
+  useAgentSkills: () => ({ data: [] }),
+  useSetAgentSkills: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 
 import { AgentEditor } from "./AgentEditor";
 
@@ -44,5 +49,16 @@ describe("A2 Agent Editor (smoke)", () => {
     expect(screen.getByText("Config")).toBeInTheDocument();
     expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("Save agent")).toBeInTheDocument();
+  });
+
+  it("renders Skills tab in the tab bar", () => {
+    renderWithIntl(<AgentEditor agent={AGENT} tab="config" onTab={() => {}} />);
+    expect(screen.getByText("Skills")).toBeInTheDocument();
+  });
+
+  it("renders SkillsTab content when tab is skills", () => {
+    renderWithIntl(<AgentEditor agent={AGENT} tab="skills" onTab={() => {}} />);
+    // The SkillsTab renders "0 of 0 enabled" count badge
+    expect(screen.getByText("0 of 0 enabled")).toBeInTheDocument();
   });
 });
