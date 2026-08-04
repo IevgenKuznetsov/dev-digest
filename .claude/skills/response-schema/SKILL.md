@@ -1,6 +1,9 @@
 ---
 name: response-schema
 description: "Detects changes to API response shapes — field types, optionality, renames, envelope restructuring. TRIGGER: when a diff modifies Zod schemas in vendor/shared/contracts/, route handler return values, Drizzle .select() shapes, or mapper functions that transform DB rows to API responses. Covers Fastify + Zod + Drizzle response contracts."
+metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 1.0.0
 ---
 
 # Response Schema Review

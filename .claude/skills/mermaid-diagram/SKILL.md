@@ -1,6 +1,9 @@
 ---
 name: mermaid-diagram
 description: "Create Mermaid diagrams in markdown. Use when the user wants to visualize workflows, architectures, API flows, data models, state machines, or system designs. Covers flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, and more."
+metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 1.0.0
 ---
 
 # Mermaid Diagram Creator

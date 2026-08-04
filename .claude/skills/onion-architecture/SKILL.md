@@ -2,6 +2,8 @@
 name: onion-architecture
 description: "Enforces Onion Architecture patterns for backend modules. Use when designing new feature modules, refactoring toward clean layering, reviewing code for dependency violations, or setting up domain-driven boundaries. Covers four concentric layers (Domain, Application, Infrastructure, Presentation), the dependency rule, DI via composition root, adapter pattern, and testing strategy. Trigger terms: onion architecture, clean architecture, hexagonal, ports and adapters, dependency rule, domain layer, use case, repository interface, composition root."
 metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 1.0.0
   tags: architecture, onion, clean-architecture, ddd, dependency-injection, layering, backend
 ---
 

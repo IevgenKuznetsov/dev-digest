@@ -1,6 +1,9 @@
 ---
 name: semver-discipline
 description: "Flags when a change requires a major, minor, or patch version bump. TRIGGER: when a diff introduces a breaking API change, adds a new feature/endpoint, drops a DB column, changes Node engine requirements, removes an export from @devdigest/shared, or bumps a peer dependency. Cross-references breaking-change and response-schema skills for severity classification."
+metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 0.1.0
 ---
 
 # Semver Discipline

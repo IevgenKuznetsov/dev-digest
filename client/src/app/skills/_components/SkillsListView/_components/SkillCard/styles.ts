@@ -66,4 +66,13 @@ export const s = {
     borderRadius: 3,
     border: "1px solid var(--border)",
   } satisfies CSSProperties,
+  statsRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginLeft: 16,
+    marginTop: 6,
+    fontSize: 11,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
 } as const;

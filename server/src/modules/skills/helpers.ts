@@ -31,14 +31,32 @@ export interface ImportPreview {
 }
 
 /**
- * Parse a markdown string to extract a name (first `# heading`) and description
- * (first non-empty paragraph after the heading). Used by the import-preview
- * endpoint — no persistence, no side effects.
+ * Extract YAML frontmatter (between `---` fences) from a markdown string.
+ * Returns key-value pairs for simple `key: value` or `key: "value"` lines.
+ */
+function parseFrontmatter(markdown: string): Record<string, string> {
+  const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return {};
+
+  const result: Record<string, string> = {};
+  for (const line of match[1]!.split('\n')) {
+    const kv = line.match(/^(\w+)\s*:\s*"?(.*?)"?\s*$/);
+    if (kv) result[kv[1]!] = kv[2]!;
+  }
+  return result;
+}
+
+/**
+ * Parse a markdown string to extract a name and description. Checks YAML
+ * frontmatter first (`name` / `description` fields), then falls back to the
+ * first `# heading` (name) and first non-empty paragraph after it (description).
+ * Used by the import-preview endpoint — no persistence, no side effects.
  */
 export function parseMarkdownSkill(markdown: string, nameOverride?: string): ImportPreview {
+  const fm = parseFrontmatter(markdown);
   const lines = markdown.split('\n');
-  let name = nameOverride ?? '';
-  let description = '';
+  let name = nameOverride ?? fm.name ?? '';
+  let description = fm.description ?? '';
 
   for (const line of lines) {
     const heading = line.match(/^#\s+(.+)/);
@@ -46,7 +64,7 @@ export function parseMarkdownSkill(markdown: string, nameOverride?: string): Imp
       name = heading[1]!.trim();
       continue;
     }
-    if (!description && name && line.trim().length > 0 && !line.startsWith('#')) {
+    if (!description && name && line.trim().length > 0 && !line.startsWith('#') && !line.startsWith('---')) {
       description = line.trim();
       break;
     }

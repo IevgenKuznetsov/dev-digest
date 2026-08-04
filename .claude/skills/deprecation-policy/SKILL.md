@@ -1,6 +1,9 @@
 ---
 name: deprecation-policy
 description: "Enforces proper deprecation workflow instead of silent removal. TRIGGER: when a diff deletes a public function, route, type, Drizzle column, or export without a deprecation phase. Covers JSDoc @deprecated, HTTP Deprecation/Sunset headers (RFC 8594), migration guides, and dual-path periods for Fastify + Drizzle + Docker stacks."
+metadata:
+   author: ievgen.kuznetsov@gmail.com
+   version: 0.1.0
 ---
 
 # Deprecation Policy

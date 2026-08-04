@@ -1,6 +1,9 @@
 ---
 name: breaking-change
 description: "Detects breaking changes to public API contracts. TRIGGER: when a diff removes or renames a Fastify route, Zod contract field, Drizzle column, Docker compose service, or TypeScript export from @devdigest/shared. Covers REST endpoints, shared types, database schema, and infrastructure contracts in a Fastify + Drizzle + PostgreSQL + Docker stack."
+metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 0.1.0
 ---
 
 # Breaking Change Detection

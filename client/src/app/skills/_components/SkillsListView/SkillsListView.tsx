@@ -118,6 +118,7 @@ export function SkillsListView() {
                 skill={sk}
                 active={sk.id === selectedId}
                 onClick={() => { setSelectedId(sk.id); setTab("config"); }}
+                onToggle={(enabled) => update.mutate({ id: sk.id, patch: { enabled } })}
               />
             ))}
           </div>

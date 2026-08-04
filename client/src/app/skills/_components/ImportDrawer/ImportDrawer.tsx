@@ -40,7 +40,7 @@ export function ImportDrawer({ onClose }: { onClose: () => void }) {
     try {
       await confirm.mutateAsync({
         name: derivedName,
-        description: "",
+        description: deriveDescriptionFromBody(body),
         type: "custom",
         source: "imported_url",
         body: body.trim(),
@@ -135,8 +135,27 @@ export function ImportDrawer({ onClose }: { onClose: () => void }) {
 }
 
 function deriveNameFromBody(body: string): string {
+  // Check frontmatter first
+  const fmName = body.match(/^---\r?\n[\s\S]*?^name\s*:\s*"?(.*?)"?\s*$/m);
+  if (fmName?.[1]) return fmName[1].trim();
   const match = body.match(/^#\s+(.+)/m);
   return match ? match[1]!.trim() : "Untitled skill";
+}
+
+function deriveDescriptionFromBody(body: string): string {
+  // Check frontmatter description first
+  const fmDesc = body.match(/^---\r?\n[\s\S]*?^description\s*:\s*"?(.*?)"?\s*$/m);
+  if (fmDesc?.[1]) return fmDesc[1].trim();
+  // Fall back to first non-empty paragraph after the heading
+  const lines = body.split("\n");
+  let foundHeading = false;
+  for (const line of lines) {
+    if (/^#\s+/.test(line)) { foundHeading = true; continue; }
+    if (foundHeading && line.trim() && !line.startsWith("#") && !line.startsWith("---")) {
+      return line.trim();
+    }
+  }
+  return "";
 }
 
 const previewBox: React.CSSProperties = {

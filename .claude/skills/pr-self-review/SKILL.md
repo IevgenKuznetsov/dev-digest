@@ -1,6 +1,10 @@
 ---
 name: pr-self-review
 description: "Proactively reviews every git commit for architecture and best-practice violations. TRIGGER: automatically invoke this skill immediately after any files are committed to git (post-commit). Analyzes the committed diff, checks client-side changes against react-frontend-best-practices, checks server-side changes against onion-architecture, lists all found issues with severity, and blocks merge when any CRITICAL issue is found. Does NOT wait for the user to ask."
+disable-model-invocation: true
+metadata:
+  author: ievgen.kuznetsov@gmail.com
+  version: 1.0.0
 ---
 
 # PR Self-Review
