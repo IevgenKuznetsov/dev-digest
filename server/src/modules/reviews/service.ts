@@ -1,5 +1,5 @@
 import type { Container } from '../../platform/container.js';
-import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
+import type { EnrichedIntent, FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
 import { ReviewRepository } from './repository.js';
@@ -7,6 +7,9 @@ import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
 import { reviewToDto } from './helpers.js';
+import { classifyIntent } from './intent-service.js';
+import { loadDiff } from './diff-loader.js';
+import { RunLogger } from '../../platform/run-logger.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -175,5 +178,29 @@ export class ReviewService {
 
   async getRunTrace(runId: string): Promise<RunTrace | undefined> {
     return this.repo.getRunTrace(runId);
+  }
+
+  // ===========================================================================
+  // Intent
+  // ===========================================================================
+
+  async getIntent(workspaceId: string, prId: string): Promise<EnrichedIntent | undefined> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    return this.repo.getIntent(prId);
+  }
+
+  async reclassifyIntent(workspaceId: string, prId: string, logger?: Logger): Promise<EnrichedIntent> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    const repoRow = await this.repo.getRepo(pull.repoId);
+    if (!repoRow) throw new NotFoundError('Repo not found');
+
+    const diff = await loadDiff(this.container, this.repo, workspaceId, pull, repoRow);
+    const runLog = new RunLogger(this.container.runBus, [], logger);
+
+    const intent = await classifyIntent(this.container, this.repo, workspaceId, pull, repoRow, diff, runLog);
+    if (!intent) throw new AppError('intent_failed', 'Intent classification failed — check logs', 500);
+    return intent;
   }
 }

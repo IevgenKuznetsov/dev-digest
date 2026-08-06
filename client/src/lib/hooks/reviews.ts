@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../toast";
 import type {
+  EnrichedIntent,
   FindingActionKind,
   PrReviewComment,
   ReviewRecord,
@@ -14,6 +15,39 @@ import type {
   RunEvent,
   RunSummaryCost,
 } from "@devdigest/shared";
+
+// ---- PR Intent (Intent Layer) ----
+
+/** Fetch the stored intent for a PR. Returns undefined/null when not yet classified (404). */
+export function usePrIntent(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pr-intent", prId],
+    queryFn: () => api.get<EnrichedIntent>(`/pulls/${prId}/intent`),
+    enabled: !!prId,
+    // Short stale time so switching to the Overview tab after a run refetches
+    staleTime: 10_000,
+    // Don't retry on 404 (not classified yet) — just show nothing
+    retry: (count, err: unknown) => {
+      const status = (err as { status?: number })?.status;
+      return status !== 404 && count < 2;
+    },
+  });
+}
+
+/** Re-classify intent on demand (POST /pulls/:id/intent). Invalidates the cache. */
+export function useClassifyIntent(prId: string | null | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<EnrichedIntent>(`/pulls/${prId}/intent`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pr-intent", prId] });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { message?: string })?.message ?? "Intent classification failed";
+      notify.error(msg);
+    },
+  });
+}
 
 // ---- Active (in-flight) runs — server-side source of truth ----
 export interface ActiveRun {

@@ -147,4 +147,24 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       return result;
     });
   }
+
+  // ---- Intent Layer --------------------------------------------------------
+
+  // GET /pulls/:id/intent — return stored intent or 404
+  app.get('/pulls/:id/intent', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    const intent = await service.getIntent(workspaceId, req.params.id);
+    if (!intent) throw new NotFoundError('Intent not classified yet');
+    return intent;
+  });
+
+  // POST /pulls/:id/intent — re-classify intent on demand (rate-limited)
+  app.post(
+    '/pulls/:id/intent',
+    { schema: { params: IdParams }, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return service.reclassifyIntent(workspaceId, req.params.id, req.log);
+    },
+  );
 }

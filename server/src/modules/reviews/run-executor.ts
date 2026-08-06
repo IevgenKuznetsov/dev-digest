@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, RunStatsCost, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import type { Provider, Review, RunTrace, RunStatsCost, UnifiedDiff, EnrichedIntent } from '@devdigest/shared';
+import { reviewPullRequest, countBlockers, filterByScope } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -8,6 +8,7 @@ import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './reposit
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import { classifyIntent } from './intent-service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -104,6 +105,17 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // Intent classification — best-effort pre-work (never fails the run).
+    let intent: EnrichedIntent | undefined;
+    intent = await runLog.step(
+      'Classifying PR intent',
+      () => classifyIntent(this.container, this.repo, workspaceId, pull, repo, diff, runLog),
+      { kind: 'tool' },
+    ).catch((err: Error) => {
+      runLog.info(`Intent classification failed — continuing without intent: ${err.message}`);
+      return undefined;
+    });
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -111,7 +123,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent);
         logger?.info(
           {
             runId,
@@ -143,6 +155,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intent?: EnrichedIntent,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -213,6 +226,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Intent Layer — inject structured intent so the reviewer is scope-aware.
+        ...(intent ? { prIntent: JSON.stringify(intent) } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -222,7 +237,18 @@ export class ReviewRunExecutor {
       });
       const { tokensIn, tokensOut, grounding } = outcome;
 
-      const keptFindings = outcome.review.findings;
+      // Apply scope filter post-grounding when intent is available.
+      // CRITICAL findings are never filtered; WARNINGs are annotated; SUGGESTIONs demoted.
+      let keptFindings = outcome.review.findings;
+      if (intent) {
+        const scopeResult = filterByScope(keptFindings, intent);
+        if (scopeResult.demoted.length > 0) {
+          runLog.info(
+            `Scope filter: demoted ${scopeResult.demoted.length} out-of-scope SUGGESTION finding(s)`,
+          );
+        }
+        keptFindings = scopeResult.kept;
+      }
 
       // ---- Persist review + findings ----------------------------------------
       const review = await this.repo.insertReview({
