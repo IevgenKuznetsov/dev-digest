@@ -5,7 +5,7 @@ Seven specialized agents: a core **research → plan → implement** pipeline pl
 | Agent | Model | Effort | Purpose |
 |-------|-------|--------|---------|
 | [researcher](#researcher) | opus | default | Find and synthesize information from repo and web |
-| [planner](#planner) | opus | high | Design implementation plans (text for user review) |
+| [planner](#planner) | opus | high | Design implementation plans → `docs/<Feature>_plan.md` |
 | [implementor](#implementor) | sonnet | medium | Execute `.spec.md` plans step by step |
 | [test-writer](#test-writer) | sonnet | medium | Write unit and integration tests |
 | [architecture-reviewer](#architecture-reviewer) | opus | high | READ-ONLY check of architecture boundaries per module |
@@ -53,23 +53,24 @@ Seven specialized agents: a core **research → plan → implement** pipeline pl
 - Verifying architecture constraints against project rules
 - Tagging each step with skills the implementor should invoke
 - Delegating external research to the researcher agent (never searches the web directly)
-- Producing a `.spec.md` artifact saved to the affected package's `specs/` folder
+- Saving the approved plan to `docs/<FeatureName>_plan.md` — the ONLY file it may create
 
-**Permissions:** Read-only. Plans are presented as text for user review, never written to files.
+**Permissions:** Read + Write (restricted to `docs/*_plan.md` only). No other file creation or editing.
 
 | Tools | Why |
 |-------|-----|
 | Read, Grep, Glob | Mandatory research phase (CLAUDE.md, schemas, modules) |
 | Bash | Git history for recent changes |
+| Write | Save approved plan to `docs/<FeatureName>_plan.md` — the only allowed file |
 | Agent (researcher) | Delegate external research questions |
-| AskUserQuestion | Ask user to review the plan before finalizing |
+| AskUserQuestion | Ask user to review the plan before saving |
 | TaskCreate, TaskUpdate | Track progress |
 
 **Preloaded skills:** onion-architecture, postgresql-table-design, mermaid-diagram, typescript-expert, security, react-best-practices, fastify-best-practices, next-best-practices, react-frontend-best-practices, zod
 
 **Input:** Feature request, bug report, or refactoring goal.
 
-**Output:** A structured plan (as text, not a file) containing context, constraints, pre-implementation checklist, ordered steps with skill tags, risk assessment, and out-of-scope notes. Always presented to the user for review before finalizing.
+**Output:** Plan presented to user for review, then saved to `docs/<FeatureName>_plan.md` after approval. Contains context, constraints, pre-implementation checklist, ordered steps with skill tags, risk assessment, and out-of-scope notes.
 
 ---
 
