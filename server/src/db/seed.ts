@@ -9,7 +9,12 @@ import {
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
 } from './seed-prompts.js';
-import { TEST_QUALITY_REVIEWER_PROMPT } from './seed-skills.js';
+import {
+  TEST_QUALITY_REVIEWER_PROMPT,
+  TEST_COVERAGE_RUBRIC,
+  API_CONTRACT_CONVENTION,
+  SECRET_LEAKAGE_GATE,
+} from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -215,12 +220,18 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       createdBy: userId,
     },
   ];
+  const agentIds = new Map<string, string>();
   for (const a of seedAgents) {
     const [existing] = await db
       .select()
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
-    if (!existing) await db.insert(t.agents).values(a);
+    if (!existing) {
+      const [inserted] = await db.insert(t.agents).values(a).returning();
+      agentIds.set(a.name, inserted!.id);
+    } else {
+      agentIds.set(a.name, existing.id);
+    }
   }
 
   // ---- Test Quality Reviewer agent ----
@@ -248,6 +259,80 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     tqrId = tqr!.id;
   } else {
     tqrId = existingTqr.id;
+  }
+
+  // ---- seed skills + link to agents ----
+  const seedSkills: Array<{
+    name: string;
+    description: string;
+    type: 'rubric' | 'convention' | 'security';
+    body: string;
+    agentName: string;
+  }> = [
+    {
+      name: 'Test Coverage Rubric',
+      description: 'Flags tests that only cover the happy path — requires boundary, error, branch, and state-transition coverage.',
+      type: 'rubric',
+      body: TEST_COVERAGE_RUBRIC,
+      agentName: 'Test Quality Reviewer',
+    },
+    {
+      name: 'API Contract Convention',
+      description: 'Detects breaking changes to public HTTP endpoint request/response contracts.',
+      type: 'convention',
+      body: API_CONTRACT_CONVENTION,
+      agentName: 'General Reviewer',
+    },
+    {
+      name: 'Secret Leakage Gate',
+      description: 'Scans diffs for hardcoded secrets, credentials, and tokens.',
+      type: 'security',
+      body: SECRET_LEAKAGE_GATE,
+      agentName: 'Security Reviewer',
+    },
+  ];
+
+  for (const sk of seedSkills) {
+    const [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
+
+    let skillId: string;
+    if (!existing) {
+      const [inserted] = await db
+        .insert(t.skills)
+        .values({
+          workspaceId,
+          name: sk.name,
+          description: sk.description,
+          type: sk.type,
+          source: 'manual',
+          body: sk.body,
+          enabled: true,
+          version: 1,
+        })
+        .returning();
+      skillId = inserted!.id;
+
+      await db.insert(t.skillVersions).values({
+        skillId,
+        version: 1,
+        body: sk.body,
+      });
+    } else {
+      skillId = existing.id;
+    }
+
+    const agentId = sk.agentName === 'Test Quality Reviewer'
+      ? tqrId
+      : agentIds.get(sk.agentName);
+    if (agentId) {
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId, skillId, order: 0 })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };
