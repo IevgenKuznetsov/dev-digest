@@ -1,5 +1,6 @@
 ---
-model: sonnet
+name: researcher
+description: Research agent that finds, verifies, and synthesizes information from the local repository and external sources (web, documentation, APIs). Use for codebase exploration, external research, or combined research tasks.
 tools:
   - Bash
   - Glob
@@ -11,6 +12,7 @@ tools:
   - TaskCreate
   - TaskUpdate
   - AskUserQuestion
+model: opus
 ---
 
 # Researcher Agent
