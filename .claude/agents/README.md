@@ -1,14 +1,16 @@
 # Agent Map
 
-Seven specialized agents: a core **research → plan → implement** pipeline plus quality and support agents.
+Nine specialized agents: a core **research → plan → implement** pipeline plus quality, orchestration, and support agents.
 
 | Agent | Model | Effort | Purpose |
 |-------|-------|--------|---------|
 | [researcher](#researcher) | opus | default | Find and synthesize information from repo and web |
 | [planner](#planner) | opus | high | Design implementation plans → `docs/<Feature>_plan.md` |
+| [brainstorm](#brainstorm) | opus | high | Spawn N planners in parallel, compare approaches with pros/cons |
 | [implementor](#implementor) | sonnet | medium | Execute `.spec.md` plans step by step |
 | [test-writer](#test-writer) | sonnet | medium | Write unit and integration tests |
 | [architecture-reviewer](#architecture-reviewer) | opus | high | READ-ONLY check of architecture boundaries per module |
+| [security-reviewer](#security-reviewer) | opus | high | READ-ONLY security scan of branch diff with severity report |
 | [plan-verifier](#plan-verifier) | opus | high | READ-ONLY point-by-point verification of plan vs implementation |
 | [doc-writer](#doc-writer) | sonnet | medium | Write documentation with Mermaid diagrams |
 
@@ -71,6 +73,37 @@ Seven specialized agents: a core **research → plan → implement** pipeline pl
 **Input:** Feature request, bug report, or refactoring goal.
 
 **Output:** Plan presented to user for review, then saved to `docs/<FeatureName>_plan.md` after approval. Contains context, constraints, pre-implementation checklist, ordered steps with skill tags, risk assessment, and out-of-scope notes.
+
+---
+
+## brainstorm
+
+**Purpose:** Multi-planner orchestrator that spawns N planner agents in parallel to generate independent solutions for the same problem, then compares all approaches with pros and cons.
+
+**Responsibilities:**
+- Clarifying the problem statement and desired number of parallel planners (default 3)
+- Crafting diverse planner prompts (simplicity, extensibility, minimal changes)
+- Spawning all planner agents concurrently via Agent tool
+- Analyzing and comparing returned plans across 6 criteria
+- Producing a structured comparison report with summary table, detailed pros/cons, idea combinations, and recommendation
+
+**Permissions:** Read-only. Cannot modify files. Does not create plan files — delegates to planner sub-agents.
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Understand codebase context for comparison |
+| Bash | Git history for context |
+| Agent (planner) | Spawn parallel planner sub-agents |
+| AskUserQuestion | Confirm problem scope and planner count |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Input:** A problem, feature request, or refactoring goal + optional planner count (default 3).
+
+**Output:** Structured comparison report with:
+- Summary table rating each plan across scope, architecture fit, risk, testability, extensibility, simplicity
+- Detailed advantages/disadvantages for each plan
+- Combinable ideas across plans
+- Recommendation (user makes final decision)
 
 ---
 
@@ -161,6 +194,40 @@ Seven specialized agents: a core **research → plan → implement** pipeline pl
 
 ---
 
+## security-reviewer
+
+**Purpose:** Read-only agent that examines the current branch's git diff against main for security vulnerabilities with severity-classified findings.
+
+**Responsibilities:**
+- Loading the `security` skill before scanning
+- Analyzing `git diff main...HEAD` for vulnerabilities across 13 categories
+- Tracing data flow from source to sink to confirm exploitability (minimizing false positives)
+- Checking project-specific security rules (SecretsProvider, INJECTION_GUARD, grounding gate)
+- Classifying findings by severity (CRITICAL/HIGH/MEDIUM/LOW/INFO)
+- Providing concrete suggested fixes for each finding
+
+**Permissions:** Read-only. Cannot modify files.
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Read changed files and trace data flow |
+| Bash | Git diff/log for branch changes |
+| Skill | Load security, typescript-expert, and other review skills |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Preloaded skills:** security, typescript-expert, fastify-best-practices, zod
+
+**Input:** Runs on the current branch — no explicit input needed (uses `git diff main...HEAD`).
+
+**Output:** Structured security report with:
+- Verdict (PASS / PASS_WITH_WARNINGS / FAIL)
+- Findings ordered by severity with file:line, code snippet, description, and suggested fix
+- "Needs Verification" section for medium-confidence items
+- Project-specific checks (SecretsProvider, INJECTION_GUARD, grounding gate, secrets in git/DB, vendor/shared)
+- Summary counts by severity
+
+---
+
 ## plan-verifier
 
 **Purpose:** Compares implemented code against ALL points of a plan — point by point, with evidence.
@@ -222,13 +289,18 @@ Core pipeline:    researcher ──findings──> planner ──plan──> imp
                                               │                    │
                                               └── delegates ───────┘ stops if plan is wrong
 
+Orchestration:    brainstorm ──spawns N──> planner (×N) ──plans──> brainstorm ──comparison──> user
+
 Quality gates:    architecture-reviewer ──findings──> user
+                  security-reviewer ──findings──> user
                   plan-verifier ──checklist──> user
 
 Support:          test-writer ──test files──> test results
                   doc-writer ──docs──> user
 ```
 
-The planner presents plans as text for user review (never writes files). The implementor
-executes approved plans. Quality gates (architecture-reviewer, plan-verifier) are read-only
-and run on demand. Support agents (test-writer, doc-writer) produce artifacts independently.
+The planner presents plans as text for user review (never writes files). The brainstorm
+agent orchestrates multiple planners in parallel and compares their outputs. The implementor
+executes approved plans. Quality gates (architecture-reviewer, security-reviewer, plan-verifier)
+are read-only and run on demand. Support agents (test-writer, doc-writer) produce artifacts
+independently.
