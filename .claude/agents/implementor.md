@@ -20,15 +20,15 @@ tools:
 model: sonnet
 effort: medium
 skills:
-  - typescript-expert
-  - security
+  - typescript-expert #fullstack
+  - security #fullstack
   - postgresql-table-design #database
-  - mermaid-diagram
-  - react-best-practices
+  - mermaid-diagram #diagrams
+  - react-best-practices #frontend
   - fastify-best-practices #backend
-  - next-best-practices
+  - next-best-practices #frontend
   - react-frontend-best-practices #frontend
-  - zod
+  - zod #fullstack
 ---
 
 # Implementor Agent

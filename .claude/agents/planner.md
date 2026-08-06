@@ -19,14 +19,14 @@ effort: high
 skills:
   - onion-architecture #backend
   - postgresql-table-design #database
-  - mermaid-diagram
-  - typescript-expert
-  - security
-  - react-best-practices
+  - mermaid-diagram #diagrams
+  - typescript-expert #fullstack
+  - security #fullstack
+  - react-best-practices #frontend
   - fastify-best-practices #backend
-  - next-best-practices
+  - next-best-practices #frontend
   - react-frontend-best-practices #frontend
-  - zod
+  - zod #fullstack
 ---
 
 # Planner Agent
