@@ -1,12 +1,16 @@
 # Agent Map
 
-Three specialized agents forming a **research > plan > implement** pipeline.
+Seven specialized agents: a core **research → plan → implement** pipeline plus quality and support agents.
 
 | Agent | Model | Effort | Purpose |
 |-------|-------|--------|---------|
 | [researcher](#researcher) | opus | default | Find and synthesize information from repo and web |
-| [planner](#planner) | opus | high | Design implementation plans as `.spec.md` files |
+| [planner](#planner) | opus | high | Design implementation plans (text for user review) |
 | [implementor](#implementor) | sonnet | medium | Execute `.spec.md` plans step by step |
+| [test-writer](#test-writer) | sonnet | medium | Write unit and integration tests |
+| [architecture-reviewer](#architecture-reviewer) | opus | high | READ-ONLY check of architecture boundaries per module |
+| [plan-verifier](#plan-verifier) | opus | high | READ-ONLY point-by-point verification of plan vs implementation |
+| [doc-writer](#doc-writer) | sonnet | medium | Write documentation with Mermaid diagrams |
 
 ---
 
@@ -51,21 +55,21 @@ Three specialized agents forming a **research > plan > implement** pipeline.
 - Delegating external research to the researcher agent (never searches the web directly)
 - Producing a `.spec.md` artifact saved to the affected package's `specs/` folder
 
-**Permissions:** Read + Write (only writes `.spec.md` files to `specs/` folders).
+**Permissions:** Read-only. Plans are presented as text for user review, never written to files.
 
 | Tools | Why |
 |-------|-----|
 | Read, Grep, Glob | Mandatory research phase (CLAUDE.md, schemas, modules) |
 | Bash | Git history for recent changes |
-| Write | Save the `.spec.md` plan file |
 | Agent (researcher) | Delegate external research questions |
+| AskUserQuestion | Ask user to review the plan before finalizing |
 | TaskCreate, TaskUpdate | Track progress |
 
 **Preloaded skills:** onion-architecture, postgresql-table-design, mermaid-diagram, typescript-expert, security, react-best-practices, fastify-best-practices, next-best-practices, react-frontend-best-practices, zod
 
 **Input:** Feature request, bug report, or refactoring goal.
 
-**Output:** A `.spec.md` file at `<package>/specs/<feature-name>.spec.md` containing context, constraints, pre-implementation checklist, ordered steps with skill tags, risk assessment, and out-of-scope notes.
+**Output:** A structured plan (as text, not a file) containing context, constraints, pre-implementation checklist, ordered steps with skill tags, risk assessment, and out-of-scope notes. Always presented to the user for review before finalizing.
 
 ---
 
@@ -99,12 +103,131 @@ Three specialized agents forming a **research > plan > implement** pipeline.
 
 ---
 
+## test-writer
+
+**Purpose:** Writes tests for UI (React/Next.js) and backend (Fastify/Drizzle) code.
+
+**Responsibilities:**
+- Reading source code and existing tests before writing
+- Invoking testing skills (react-testing-library, fastify-best-practices) before writing
+- Following test conventions: `*.test.ts` for unit, `*.it.test.ts` for integration
+- Using mocks from `server/src/adapters/mocks.ts` for server unit tests
+- Running tests after writing to verify they pass
+
+**Permissions:** Read/write for test files only. No production code.
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Understand code under test and existing test patterns |
+| Edit, Write | Create and modify test files |
+| Bash | Run tests after writing |
+| Skill, ToolSearch | Invoke testing skills before writing |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Preloaded skills:** react-testing-library, react-best-practices, react-frontend-best-practices, fastify-best-practices, drizzle-orm-patterns, zod, typescript-expert
+
+**Input:** File path, module name, or `.spec.md` plan with test requirements.
+
+**Output:** Test files + test run results summary.
+
+---
+
+## architecture-reviewer
+
+**Purpose:** Read-only agent that checks architecture boundaries for a specific module on demand.
+
+**Responsibilities:**
+- Checking onion architecture layer violations (domain → application → infrastructure)
+- Validating module isolation (no cross-module internal imports)
+- Verifying CLAUDE.md "Do not touch" rules (vendor/shared, INJECTION_GUARD, grounding gate)
+- Checking secrets handling (SecretsProvider only)
+- Providing evidence for every finding (file:line + code snippet)
+
+**Permissions:** Read-only. Cannot modify files.
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Search for violations and read code |
+| Bash | Git diff/log/blame for change analysis |
+| Skill | Load onion-architecture and other review skills |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Preloaded skills:** onion-architecture, react-frontend-best-practices, typescript-expert, security, fastify-best-practices, zod
+
+**Input:** A specific module to review (e.g., "reviews module", "server/src/modules/agents").
+
+**Output:** Structured report with severity-classified findings, each with file:line evidence and rule source citation.
+
+---
+
+## plan-verifier
+
+**Purpose:** Compares implemented code against ALL points of a plan — point by point, with evidence.
+
+**Responsibilities:**
+- Parsing every step, sub-point, and constraint from the plan
+- Verifying each item individually with PASS/FAIL/PARTIAL + file:line evidence
+- Checking for scope creep (files changed outside the plan)
+- Checking out-of-scope violations
+- Never giving general advice or "looks good" summaries
+
+**Permissions:** Read-only. Cannot modify files.
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Read plan and verify implementation |
+| Bash | Git diff to see what changed |
+| TaskCreate, TaskUpdate | Track checklist progress |
+
+**Input:** Spec file path OR pasted plan text, optionally with a git range.
+
+**Output:** Point-by-point verification table with PASS/FAIL/PARTIAL status and evidence for every requirement.
+
+---
+
+## doc-writer
+
+**Purpose:** Writes documentation for implemented features with Mermaid diagrams.
+
+**Responsibilities:**
+- Reading actual implementation code (not just plans) before documenting
+- Creating docs in `<package>/docs/<FeatureName>/` directories
+- Including Mermaid diagrams (flowcharts, sequence diagrams, ER diagrams, state diagrams)
+- Updating existing docs rather than creating duplicates
+- Never creating CLAUDE.md, INSIGHTS.md, or .spec.md files
+
+**Permissions:** Read/write for documentation files only.
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Understand code being documented |
+| Edit, Write | Create/modify documentation files |
+| Bash | Git log for recent changes |
+| Skill, ToolSearch | Invoke mermaid-diagram before creating diagrams |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Preloaded skills:** mermaid-diagram, onion-architecture, react-frontend-best-practices, typescript-expert, fastify-best-practices, next-best-practices
+
+**Input:** Feature description, module name, or `.spec.md` plan.
+
+**Output:** Documentation files in `<package>/docs/<FeatureName>/` + report of what was written.
+
+---
+
 ## Pipeline Flow
 
 ```
-researcher ──findings──> planner ──.spec.md──> implementor ──report──> user
-                            │                       │
-                            └── delegates research ─┘ stops if plan is wrong
+Core pipeline:    researcher ──findings──> planner ──plan──> implementor ──report──> user
+                                              │                    │
+                                              └── delegates ───────┘ stops if plan is wrong
+
+Quality gates:    architecture-reviewer ──findings──> user
+                  plan-verifier ──checklist──> user
+
+Support:          test-writer ──test files──> test results
+                  doc-writer ──docs──> user
 ```
 
-The planner is the orchestration point: it spawns researcher agents for external questions and produces the artifact the implementor consumes. The implementor never makes architectural decisions; the researcher never modifies files.
+The planner presents plans as text for user review (never writes files). The implementor
+executes approved plans. Quality gates (architecture-reviewer, plan-verifier) are read-only
+and run on demand. Support agents (test-writer, doc-writer) produce artifacts independently.
