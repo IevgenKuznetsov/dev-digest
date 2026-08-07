@@ -399,25 +399,33 @@ export class PullsService {
 
     if (files.length === 0) throw new NotFoundError('No files found for this pull request');
 
-    // Fetch findings from the latest review (kind = 'review') if any.
-    const [latestReview] = await this.container.db
-      .select({ id: t.reviews.id })
+    // Fetch findings from the latest review per agent (kind = 'review').
+    // This ensures Smart Diff shows findings from ALL agents, not just the most recent single run.
+    const allReviews = await this.container.db
+      .select({ id: t.reviews.id, agentId: t.reviews.agentId, createdAt: t.reviews.createdAt })
       .from(t.reviews)
       .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, 'review')))
-      .orderBy(desc(t.reviews.createdAt))
-      .limit(1);
+      .orderBy(desc(t.reviews.createdAt));
+
+    // Keep only the latest review per agent (or per null agentId as a single group)
+    const latestByAgent = new Map<string, string>();
+    for (const r of allReviews) {
+      const key = r.agentId ?? '__no_agent__';
+      if (!latestByAgent.has(key)) latestByAgent.set(key, r.id);
+    }
+    const reviewIds = [...latestByAgent.values()];
 
     const findingsByFile = new Map<string, number[]>();
 
-    if (latestReview) {
+    if (reviewIds.length > 0) {
       const findingRows = await this.container.db
-        .select({ file: t.findings.file, startLine: t.findings.startLine })
+        .select({ file: t.findings.file, startLine: t.findings.startLine, endLine: t.findings.endLine })
         .from(t.findings)
-        .where(eq(t.findings.reviewId, latestReview.id));
+        .where(inArray(t.findings.reviewId, reviewIds));
 
       for (const row of findingRows) {
         const lines = findingsByFile.get(row.file) ?? [];
-        lines.push(row.startLine);
+        for (let l = row.startLine; l <= row.endLine; l++) lines.push(l);
         findingsByFile.set(row.file, lines);
       }
     }

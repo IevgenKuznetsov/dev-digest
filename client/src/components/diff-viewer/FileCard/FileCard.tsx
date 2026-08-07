@@ -38,6 +38,7 @@ export function FileCard({
   findingLines,
   findingsMap,
   fileFindings,
+  onFindingClick,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
@@ -48,6 +49,8 @@ export function FileCard({
   findingsMap?: Map<number, LineFinding>;
   /** Full finding records for this file — used for the tooltip on the finding badge. */
   fileFindings?: FindingRecord[];
+  /** Callback when a finding badge/annotation is clicked — navigates to findings tab. */
+  onFindingClick?: (findingId: string) => void;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -74,7 +77,18 @@ export function FileCard({
     () => (findingLines?.length ? new Set(findingLines) : null),
     [findingLines],
   );
-  const findingCount = findingsMap?.size ?? findingLines?.length ?? 0;
+  // Count actual findings (exclude range-only continuation lines)
+  const findingCount = findingsMap
+    ? [...findingsMap.values()].filter((f) => !f.isRangeOnly).length
+    : fileFindings?.length ?? 0;
+
+  // Build a quick lookup by finding ID for passing full records to CodeLine
+  const findingRecordById = React.useMemo(() => {
+    if (!fileFindings?.length) return null;
+    const map = new Map<string, FindingRecord>();
+    for (const f of fileFindings) map.set(f.id, f);
+    return map;
+  }, [fileFindings]);
 
   // Compute highest severity across all findings in this file for the badge color
   const SEV_RANK: Record<LineFinding["severity"], number> = { CRITICAL: 0, WARNING: 1, SUGGESTION: 2 };
@@ -108,16 +122,22 @@ export function FileCard({
         </span>
         {findingCount > 0 && (
           (() => {
+            const topFinding = fileFindings?.length
+              ? fileFindings.reduce((best, f) => (SEV_RANK[f.severity as LineFinding["severity"]] < SEV_RANK[best.severity as LineFinding["severity"]] ? f : best))
+              : null;
+            const clickable = !!(topFinding && onFindingClick);
             const badge = (
-              <span style={{ ...s.findingBadge, color: badgeColors.c, background: badgeColors.bg }}>
+              <span
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                style={{ ...s.findingBadge, color: badgeColors.c, background: badgeColors.bg, cursor: clickable ? "pointer" : undefined }}
+                onClick={clickable ? (e: React.MouseEvent) => { e.stopPropagation(); onFindingClick!(topFinding!.id); } : undefined}
+                onKeyDown={clickable ? (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onFindingClick!(topFinding!.id); } } : undefined}
+              >
                 <Icon.AlertTriangle size={12} />
                 {findingCount}
               </span>
             );
-            // Show tooltip with top finding (highest severity) if we have full finding data
-            const topFinding = fileFindings?.length
-              ? fileFindings.reduce((best, f) => (SEV_RANK[f.severity as LineFinding["severity"]] < SEV_RANK[best.severity as LineFinding["severity"]] ? f : best))
-              : null;
             if (!topFinding) return badge;
             const sev = SEV[topFinding.severity as keyof typeof SEV];
             return (
@@ -162,22 +182,36 @@ export function FileCard({
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (
-            lines.map((ln, i) => {
-              const lineFinding = ln.newNo !== undefined
-                ? findingsMap?.get(ln.newNo) ??
-                  (findingSet?.has(ln.newNo) ? { severity: "WARNING" as const, title: "" } : undefined)
-                : undefined;
-              return (
-                <CodeLine
-                  key={i}
-                  ln={ln}
-                  path={file.path}
-                  threads={threadsForLine(ln, matched)}
-                  commenting={commenting}
-                  finding={lineFinding}
-                />
-              );
-            })
+            (() => {
+              // Track which findings have shown their badge so we can promote
+              // the first visible range-only line when start_line is outside the diff.
+              const badgeShown = new Set<string>();
+              return lines.map((ln, i) => {
+                let lineFinding = ln.newNo !== undefined
+                  ? findingsMap?.get(ln.newNo) ??
+                    (findingSet?.has(ln.newNo) ? { severity: "WARNING" as const, title: "" } : undefined)
+                  : undefined;
+                // Promote the first visible range-only line to show the badge
+                if (lineFinding?.isRangeOnly && lineFinding.findingId && !badgeShown.has(lineFinding.findingId)) {
+                  lineFinding = { ...lineFinding, isRangeOnly: false };
+                }
+                if (lineFinding && !lineFinding.isRangeOnly && lineFinding.findingId) {
+                  badgeShown.add(lineFinding.findingId);
+                }
+                return (
+                  <CodeLine
+                    key={i}
+                    ln={ln}
+                    path={file.path}
+                    threads={threadsForLine(ln, matched)}
+                    commenting={commenting}
+                    finding={lineFinding}
+                    findingRecord={lineFinding?.findingId ? findingRecordById?.get(lineFinding.findingId) : undefined}
+                    onFindingClick={onFindingClick}
+                  />
+                );
+              });
+            })()
           )}
           {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
         </div>

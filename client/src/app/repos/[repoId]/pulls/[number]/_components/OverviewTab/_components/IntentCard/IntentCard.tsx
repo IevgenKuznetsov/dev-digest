@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Badge, Button } from "@devdigest/ui";
+import { Badge, Button, Tooltip } from "@devdigest/ui";
 import type { EnrichedIntent, IntentConfidence } from "@devdigest/shared";
 import { usePrIntent, useClassifyIntent } from "@/lib/hooks/reviews";
 
@@ -237,9 +237,24 @@ export function IntentCard({ prId }: IntentCardProps) {
           <div style={s.riskLabel}>⚠ Risk Areas</div>
           <div style={s.riskTags}>
             {intent.risk_areas.map((area: string, i: number) => (
-              <Badge key={i} color="var(--warning, #f59e0b)" bg="rgba(245,158,11,0.1)">
-                {area}
-              </Badge>
+              <Tooltip
+                key={i}
+                trigger={
+                  <Badge
+                    color="var(--warning, #f59e0b)"
+                    bg="rgba(245,158,11,0.1)"
+                    style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
+                    {area}
+                  </Badge>
+                }
+                width={320}
+                align="center"
+              >
+                <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--text-primary)" }}>
+                  {area}
+                </div>
+              </Tooltip>
             ))}
           </div>
         </div>

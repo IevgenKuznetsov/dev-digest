@@ -478,6 +478,8 @@ Matches the design in `docs/IntentLayer/design1.png`:
 - Confidence badge shown when not "high"
 - "Low confidence — inferred from title and diff" tooltip
 - Sources metadata shown in collapsed details (how many signals used)
+- Risk area badges are truncated with ellipsis (max 260px) and wrapped in a `<Tooltip>`
+  that shows the full risk area message on hover (320px wide, center-aligned)
 
 ### 9b. usePrIntent hook
 

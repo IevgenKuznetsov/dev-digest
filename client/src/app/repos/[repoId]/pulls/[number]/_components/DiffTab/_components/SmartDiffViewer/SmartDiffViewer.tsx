@@ -16,9 +16,11 @@ interface SmartDiffViewerProps {
   commenting?: DiffCommentApi;
   /** All findings from the latest review — used to annotate lines with severity. */
   findings?: FindingRecord[];
+  /** Callback when a finding badge is clicked — navigates to findings tab. */
+  onFindingClick?: (findingId: string) => void;
 }
 
-export function SmartDiffViewer({ groups, files, commenting, findings }: SmartDiffViewerProps) {
+export function SmartDiffViewer({ groups, files, commenting, findings, onFindingClick }: SmartDiffViewerProps) {
   const [collapsed, setCollapsed] = React.useState(DEFAULT_COLLAPSED);
   const fileRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -40,7 +42,26 @@ export function SmartDiffViewer({ groups, files, commenting, findings }: SmartDi
       const existing = lineMap.get(f.start_line);
       const sevRank: Record<string, number> = { CRITICAL: 0, WARNING: 1, SUGGESTION: 2 };
       if (!existing || (sevRank[f.severity] ?? 9) < (sevRank[existing.severity] ?? 9)) {
-        lineMap.set(f.start_line, { severity: f.severity as LineFinding["severity"], title: f.title });
+        lineMap.set(f.start_line, {
+          severity: f.severity as LineFinding["severity"],
+          title: f.title,
+          findingId: f.id,
+          reviewId: f.review_id,
+        });
+      }
+      // Highlight continuation lines in the range (no badge, just row tinting)
+      for (let line = f.start_line + 1; line <= f.end_line; line++) {
+        const ex = lineMap.get(line);
+        // Don't overwrite a primary finding anchor on the same line
+        if (!ex || (ex.isRangeOnly && (sevRank[f.severity] ?? 9) < (sevRank[ex.severity] ?? 9))) {
+          lineMap.set(line, {
+            severity: f.severity as LineFinding["severity"],
+            title: f.title,
+            findingId: f.id,
+            reviewId: f.review_id,
+            isRangeOnly: true,
+          });
+        }
       }
     }
     return map;
@@ -132,6 +153,7 @@ export function SmartDiffViewer({ groups, files, commenting, findings }: SmartDi
                     findingLines={smartFile.finding_lines}
                     findingsMap={findingsByFile.get(smartFile.path)}
                     fileFindings={findingRecordsByFile.get(smartFile.path)}
+                    onFindingClick={onFindingClick}
                   />
                 </div>
               );

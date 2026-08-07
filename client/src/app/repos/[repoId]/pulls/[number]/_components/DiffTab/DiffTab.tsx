@@ -37,9 +37,11 @@ interface DiffTabProps {
   files: PrFile[];
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
+  /** Callback when a finding badge is clicked — navigates to findings tab. */
+  onFindingClick?: (findingId: string) => void;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+export function DiffTab({ prId, filesCount, files, canComment, onFindingClick }: DiffTabProps) {
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   const { data: smartDiff, isLoading: smartDiffLoading } = useSmartDiff(prId);
@@ -112,7 +114,7 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
         Files changed · {filesCount} files
       </SectionLabel>
       {showGrouped ? (
-        <SmartDiffViewer groups={smartDiff!.groups} files={files} commenting={commenting} findings={allFindings} />
+        <SmartDiffViewer groups={smartDiff!.groups} files={files} commenting={commenting} findings={allFindings} onFindingClick={onFindingClick} />
       ) : (
         <DiffViewer files={files} commenting={commenting} />
       )}
