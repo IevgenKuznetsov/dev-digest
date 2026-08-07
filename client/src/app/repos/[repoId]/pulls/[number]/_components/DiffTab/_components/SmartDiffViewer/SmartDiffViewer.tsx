@@ -92,13 +92,13 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
 
   const groupElements = ROLE_ORDER.map((role) => {
     const group = groupMap.get(role);
-    if (!group) return null;
-
-    const filesWithFindings = group.files.filter((f) => f.finding_lines.length > 0);
-    if (filesWithFindings.length === 0) return null;
+    if (!group || group.files.length === 0) return null;
 
     const isCollapsed = collapsed[role];
-    const totalFindings = filesWithFindings.reduce((sum, f) => sum + f.finding_lines.length, 0);
+    const filesWithFindings = group.files.filter((f) => f.finding_lines.length > 0);
+    const findingsCount = filesWithFindings.length;
+    // Count actual findings (unique start_lines), not range-expanded lines
+    const totalFindings = findingsCount;
 
     return (
       <div key={role} style={s.group}>
@@ -106,10 +106,10 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
           icon={ROLE_ICONS[role] as IconName}
           right={
             <div style={s.badges}>
-              <Badge>{filesWithFindings.length} files</Badge>
+              <Badge>{group.files.length} files</Badge>
               {totalFindings > 0 && (
                 <Badge bg="var(--warn-bg)" color="var(--warn)">
-                  {totalFindings} findings
+                  {totalFindings} with findings
                 </Badge>
               )}
               <div
@@ -134,10 +134,9 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
 
         {!isCollapsed && (
           <div style={s.groupBody}>
-            {filesWithFindings.map((smartFile) => {
+            {group.files.map((smartFile) => {
               const prFile = fileByPath.get(smartFile.path);
               if (!prFile) return null;
-              const findingCount = smartFile.finding_lines.length;
               return (
                 <div
                   key={smartFile.path}

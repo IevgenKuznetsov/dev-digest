@@ -77,11 +77,6 @@ export function FileCard({
     () => (findingLines?.length ? new Set(findingLines) : null),
     [findingLines],
   );
-  // Count actual findings (exclude range-only continuation lines)
-  const findingCount = findingsMap
-    ? [...findingsMap.values()].filter((f) => !f.isRangeOnly).length
-    : fileFindings?.length ?? 0;
-
   // Build a quick lookup by finding ID for passing full records to CodeLine
   const findingRecordById = React.useMemo(() => {
     if (!fileFindings?.length) return null;
@@ -90,23 +85,12 @@ export function FileCard({
     return map;
   }, [fileFindings]);
 
-  // Compute highest severity across all findings in this file for the badge color
   const SEV_RANK: Record<LineFinding["severity"], number> = { CRITICAL: 0, WARNING: 1, SUGGESTION: 2 };
   const SEV_BADGE: Record<LineFinding["severity"], { c: string; bg: string }> = {
     CRITICAL:   { c: "var(--crit)", bg: "var(--crit-bg)" },
     WARNING:    { c: "var(--warn)", bg: "var(--warn-bg)" },
     SUGGESTION: { c: "var(--sugg)", bg: "var(--sugg-bg)" },
   };
-  const highestSeverity = React.useMemo(() => {
-    if (!findingsMap?.size) return null;
-    let best: LineFinding["severity"] = "SUGGESTION";
-    for (const f of findingsMap.values()) {
-      if (SEV_RANK[f.severity] < SEV_RANK[best]) best = f.severity;
-    }
-    return best;
-  }, [findingsMap]);
-
-  const badgeColors = highestSeverity ? SEV_BADGE[highestSeverity] : SEV_BADGE.WARNING;
 
   return (
     <div style={s.fileCard}>
@@ -120,54 +104,52 @@ export function FileCard({
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
         </span>
-        {findingCount > 0 && (
-          (() => {
-            const topFinding = fileFindings?.length
-              ? fileFindings.reduce((best, f) => (SEV_RANK[f.severity as LineFinding["severity"]] < SEV_RANK[best.severity as LineFinding["severity"]] ? f : best))
-              : null;
-            const clickable = !!(topFinding && onFindingClick);
-            const badge = (
-              <span
-                role={clickable ? "button" : undefined}
-                tabIndex={clickable ? 0 : undefined}
-                style={{ ...s.findingBadge, color: badgeColors.c, background: badgeColors.bg, cursor: clickable ? "pointer" : undefined }}
-                onClick={clickable ? (e: React.MouseEvent) => { e.stopPropagation(); onFindingClick!(topFinding!.id); } : undefined}
-                onKeyDown={clickable ? (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onFindingClick!(topFinding!.id); } } : undefined}
-              >
-                <Icon.AlertTriangle size={12} />
-                {findingCount}
-              </span>
-            );
-            if (!topFinding) return badge;
-            const sev = SEV[topFinding.severity as keyof typeof SEV];
-            return (
-              <Tooltip
-                trigger={badge}
-                width={300}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: sev.c, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    {sev.label}
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {topFinding.title}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      {topFinding.file}:{topFinding.start_line}
+        {fileFindings && fileFindings.length > 0 && (() => {
+          const bySev: Record<string, FindingRecord[]> = {};
+          for (const f of fileFindings) {
+            (bySev[f.severity] ??= []).push(f);
+          }
+          const order: LineFinding["severity"][] = ["CRITICAL", "WARNING", "SUGGESTION"];
+          return order
+            .filter((sev) => bySev[sev]?.length)
+            .map((severity) => {
+              const findings = bySev[severity]!;
+              const colors = SEV_BADGE[severity];
+              const sev = SEV[severity];
+              const SevIcon = severity === "CRITICAL" ? Icon.AlertOctagon : severity === "WARNING" ? Icon.AlertTriangle : Icon.Lightbulb;
+              return (
+                <Tooltip
+                  key={severity}
+                  trigger={
+                    <span
+                      style={{ ...s.findingBadge, color: colors.c, background: colors.bg }}
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    >
+                      <SevIcon size={12} />
+                      {findings.length}
                     </span>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>
-                      {Math.round(topFinding.confidence * 100)}% conf
-                    </span>
+                  }
+                  width={320}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: sev.c, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      {sev.label} ({findings.length})
+                    </div>
+                    {findings.map((f) => (
+                      <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8, borderLeft: `2px solid ${sev.c}` }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
+                          {f.title}
+                        </div>
+                        <div className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          L{f.start_line}{f.end_line && f.end_line !== f.start_line ? `–${f.end_line}` : ""}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    {topFinding.rationale.length > 120 ? topFinding.rationale.slice(0, 120) + "..." : topFinding.rationale}
-                  </div>
-                </div>
-              </Tooltip>
-            );
-          })()
-        )}
+                </Tooltip>
+              );
+            });
+        })()}
         {commentCount > 0 && (
           <span
             style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-muted)" }}

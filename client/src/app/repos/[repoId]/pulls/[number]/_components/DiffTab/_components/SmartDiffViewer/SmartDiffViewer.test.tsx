@@ -59,48 +59,41 @@ const GROUPS: SmartDiffGroup[] = [
 const ALL_FILES: PrFile[] = [CORE_FILE, WIRING_FILE, BOILERPLATE_FILE];
 
 describe("SmartDiffViewer", () => {
-  it("renders group headings only for roles that have files with findings", () => {
+  it("renders group headings for all roles that have files", () => {
     render(<SmartDiffViewer groups={GROUPS} files={ALL_FILES} />);
-    // Only core has findings — only Core heading is shown
+    // All groups have files — all headings are shown
     expect(screen.getByText("Core")).toBeInTheDocument();
-    expect(screen.queryByText("Wiring")).not.toBeInTheDocument();
-    expect(screen.queryByText("Boilerplate")).not.toBeInTheDocument();
+    expect(screen.getByText("Wiring")).toBeInTheDocument();
+    expect(screen.getByText("Boilerplate")).toBeInTheDocument();
   });
 
-  it("shows file count badges reflecting only files with findings", () => {
+  it("shows file count badges reflecting all files in the group", () => {
     render(<SmartDiffViewer groups={GROUPS} files={ALL_FILES} />);
-    // Only core group is shown and it has 1 file with findings
+    // Each group has 1 file
     const badges = screen.getAllByText("1 files");
-    expect(badges.length).toBe(1);
+    expect(badges.length).toBe(3);
   });
 
-  it("shows finding count badge in group header", () => {
+  it("shows finding count badge only for groups with findings", () => {
     render(<SmartDiffViewer groups={GROUPS} files={ALL_FILES} />);
-    // core group has 2 findings — group header badge
-    expect(screen.getByText("2 findings")).toBeInTheDocument();
+    // core group has 1 file with findings
+    expect(screen.getByText("1 with findings")).toBeInTheDocument();
   });
 
-  it("hides groups where no files have findings", () => {
+  it("renders all groups even when their files have no findings", () => {
     render(<SmartDiffViewer groups={GROUPS} files={ALL_FILES} />);
-    // Wiring group has 0 findings — its FileCard should not appear
-    expect(screen.queryByTestId("file-card-src/index.ts")).not.toBeInTheDocument();
-    // Boilerplate group has 0 findings — its FileCard should not appear
+    // Wiring group has 0 findings but its FileCard should still appear
+    expect(screen.getByTestId("file-card-src/index.ts")).toBeInTheDocument();
+    // Boilerplate is collapsed by default — its FileCard is not rendered until expanded
     expect(screen.queryByTestId("file-card-package-lock.json")).not.toBeInTheDocument();
   });
 
-  it("shows empty state when no files have findings at all", () => {
-    const noFindingGroups: SmartDiffGroup[] = [
-      {
-        role: "core",
-        files: [{ path: "src/auth.ts", additions: 5, deletions: 2, finding_lines: [], pseudocode_summary: null }],
-      },
-    ];
-    const noFindingFiles: PrFile[] = [CORE_FILE];
-    render(<SmartDiffViewer groups={noFindingGroups} files={noFindingFiles} />);
+  it("shows empty state when no groups have files", () => {
+    const emptyGroups: SmartDiffGroup[] = [];
+    render(<SmartDiffViewer groups={emptyGroups} files={[]} />);
     expect(
       screen.getByText(/No findings yet\. Run a review or switch to Flat view/)
     ).toBeInTheDocument();
-    expect(screen.queryByText("Core")).not.toBeInTheDocument();
   });
 
   it("boilerplate section is collapsed by default", () => {
