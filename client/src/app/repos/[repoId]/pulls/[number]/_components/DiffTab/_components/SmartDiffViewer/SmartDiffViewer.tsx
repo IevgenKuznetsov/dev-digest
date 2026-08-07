@@ -4,7 +4,8 @@ import React from "react";
 import { Badge, SectionLabel, Icon, type IconName } from "@devdigest/ui";
 import { FileCard } from "@/components/diff-viewer/FileCard";
 import type { DiffCommentApi } from "@/components/diff-viewer";
-import type { SmartDiffGroup } from "@devdigest/shared";
+import type { LineFinding } from "@/components/diff-viewer/CodeLine";
+import type { SmartDiffGroup, FindingRecord } from "@devdigest/shared";
 import type { PrFile } from "@devdigest/shared";
 import { ROLE_ORDER, ROLE_LABELS, ROLE_ICONS, DEFAULT_COLLAPSED, FILE_DEFAULT_EXPANDED } from "./constants";
 import { s } from "./styles";
@@ -13,9 +14,11 @@ interface SmartDiffViewerProps {
   groups: SmartDiffGroup[];
   files: PrFile[];
   commenting?: DiffCommentApi;
+  /** All findings from the latest review — used to annotate lines with severity. */
+  findings?: FindingRecord[];
 }
 
-export function SmartDiffViewer({ groups, files, commenting }: SmartDiffViewerProps) {
+export function SmartDiffViewer({ groups, files, commenting, findings }: SmartDiffViewerProps) {
   const [collapsed, setCollapsed] = React.useState(DEFAULT_COLLAPSED);
   const fileRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -25,6 +28,34 @@ export function SmartDiffViewer({ groups, files, commenting }: SmartDiffViewerPr
     for (const f of files) map.set(f.path, f);
     return map;
   }, [files]);
+
+  // Build per-file, per-line finding lookup: file → Map<lineNo, LineFinding>
+  const findingsByFile = React.useMemo(() => {
+    const map = new Map<string, Map<number, LineFinding>>();
+    if (!findings?.length) return map;
+    for (const f of findings) {
+      if (!map.has(f.file)) map.set(f.file, new Map());
+      const lineMap = map.get(f.file)!;
+      // Use start_line as the anchor; if multiple findings on same line, highest severity wins
+      const existing = lineMap.get(f.start_line);
+      const sevRank: Record<string, number> = { CRITICAL: 0, WARNING: 1, SUGGESTION: 2 };
+      if (!existing || (sevRank[f.severity] ?? 9) < (sevRank[existing.severity] ?? 9)) {
+        lineMap.set(f.start_line, { severity: f.severity as LineFinding["severity"], title: f.title });
+      }
+    }
+    return map;
+  }, [findings]);
+
+  // Build per-file full FindingRecord[] lookup for tooltips
+  const findingRecordsByFile = React.useMemo(() => {
+    const map = new Map<string, FindingRecord[]>();
+    if (!findings?.length) return map;
+    for (const f of findings) {
+      if (!map.has(f.file)) map.set(f.file, []);
+      map.get(f.file)!.push(f);
+    }
+    return map;
+  }, [findings]);
 
   // Render groups in ROLE_ORDER, skip groups not present in the data
   const groupMap = React.useMemo(() => {
@@ -56,7 +87,7 @@ export function SmartDiffViewer({ groups, files, commenting }: SmartDiffViewerPr
             <div style={s.badges}>
               <Badge>{filesWithFindings.length} files</Badge>
               {totalFindings > 0 && (
-                <Badge bg="var(--sev-warning-bg)" color="var(--sev-warning)">
+                <Badge bg="var(--warn-bg)" color="var(--warn)">
                   {totalFindings} findings
                 </Badge>
               )}
@@ -99,6 +130,8 @@ export function SmartDiffViewer({ groups, files, commenting }: SmartDiffViewerPr
                     commenting={commenting}
                     defaultExpanded={FILE_DEFAULT_EXPANDED[role]}
                     findingLines={smartFile.finding_lines}
+                    findingsMap={findingsByFile.get(smartFile.path)}
+                    fileFindings={findingRecordsByFile.get(smartFile.path)}
                   />
                 </div>
               );

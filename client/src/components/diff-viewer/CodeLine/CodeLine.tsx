@@ -9,19 +9,25 @@ import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 
+/** Finding annotation anchored to this line (severity + title). */
+export interface LineFinding {
+  severity: "CRITICAL" | "WARNING" | "SUGGESTION";
+  title: string;
+}
+
 export function CodeLine({
   ln,
   path,
   threads,
   commenting,
-  highlight,
+  finding,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
-  /** Whether this line has a finding — shown with a highlighted background. */
-  highlight?: boolean;
+  /** Finding annotation for this line — highlights row and shows label on the right. */
+  finding?: LineFinding;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -44,7 +50,7 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind, highlight)}>
+      <div style={lineRowFor(ln.kind, finding?.severity)}>
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button
@@ -65,6 +71,14 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {finding && (
+          <span style={s.findingAnnotation}>
+            <span style={s.findingDot(finding.severity)} />
+            <span style={s.findingLabel}>
+              {finding.severity === "CRITICAL" ? "Blocker" : finding.severity === "WARNING" ? "Warning" : "Suggestion"}
+            </span>
+          </span>
+        )}
       </div>
 
       {commenting &&

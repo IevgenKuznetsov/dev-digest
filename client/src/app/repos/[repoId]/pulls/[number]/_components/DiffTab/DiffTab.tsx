@@ -3,7 +3,7 @@
 import React from "react";
 import { SectionLabel, Button } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
-import { usePrComments, useCreatePrComment, useSmartDiff } from "@/lib/hooks/reviews";
+import { usePrComments, useCreatePrComment, useSmartDiff, usePrReviews } from "@/lib/hooks/reviews";
 import { SmartDiffViewer } from "./_components/SmartDiffViewer";
 import { notify } from "@/lib/toast";
 import type { PrFile } from "@devdigest/shared";
@@ -43,6 +43,12 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   const { data: smartDiff, isLoading: smartDiffLoading } = useSmartDiff(prId);
+  const { data: reviews } = usePrReviews(prId);
+  // Flatten all findings from reviews for severity annotations in Smart Diff
+  const allFindings = React.useMemo(
+    () => (reviews ?? []).flatMap((r) => r.findings),
+    [reviews],
+  );
   // Comments start hidden so the diff is clean by default — toggle to reveal.
   const [showComments, setShowComments] = React.useState(false);
   // Toggle between grouped (Smart Diff) and flat view. Default to grouped when data is ready.
@@ -106,7 +112,7 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
         Files changed · {filesCount} files
       </SectionLabel>
       {showGrouped ? (
-        <SmartDiffViewer groups={smartDiff!.groups} files={files} commenting={commenting} />
+        <SmartDiffViewer groups={smartDiff!.groups} files={files} commenting={commenting} findings={allFindings} />
       ) : (
         <DiffViewer files={files} commenting={commenting} />
       )}

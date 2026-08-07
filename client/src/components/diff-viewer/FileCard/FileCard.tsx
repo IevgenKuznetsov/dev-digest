@@ -4,8 +4,9 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
+import { Icon, Tooltip, SEV } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
+import type { FindingRecord } from "@devdigest/shared";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
 import { parsePatch, type Line } from "../helpers";
 import {
@@ -16,7 +17,7 @@ import {
   type DiffCommentApi,
 } from "../comments";
 import { s, chevronFor } from "../styles";
-import { CodeLine } from "../CodeLine";
+import { CodeLine, type LineFinding } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
@@ -35,12 +36,18 @@ export function FileCard({
   commenting,
   defaultExpanded,
   findingLines,
+  findingsMap,
+  fileFindings,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   defaultExpanded?: boolean;
   /** Line numbers (new-side) that have findings — highlighted in the diff. */
   findingLines?: number[];
+  /** Per-line finding annotations with severity + title (overrides findingLines when present). */
+  findingsMap?: Map<number, LineFinding>;
+  /** Full finding records for this file — used for the tooltip on the finding badge. */
+  fileFindings?: FindingRecord[];
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -67,7 +74,25 @@ export function FileCard({
     () => (findingLines?.length ? new Set(findingLines) : null),
     [findingLines],
   );
-  const findingCount = findingLines?.length ?? 0;
+  const findingCount = findingsMap?.size ?? findingLines?.length ?? 0;
+
+  // Compute highest severity across all findings in this file for the badge color
+  const SEV_RANK: Record<LineFinding["severity"], number> = { CRITICAL: 0, WARNING: 1, SUGGESTION: 2 };
+  const SEV_BADGE: Record<LineFinding["severity"], { c: string; bg: string }> = {
+    CRITICAL:   { c: "var(--crit)", bg: "var(--crit-bg)" },
+    WARNING:    { c: "var(--warn)", bg: "var(--warn-bg)" },
+    SUGGESTION: { c: "var(--sugg)", bg: "var(--sugg-bg)" },
+  };
+  const highestSeverity = React.useMemo(() => {
+    if (!findingsMap?.size) return null;
+    let best: LineFinding["severity"] = "SUGGESTION";
+    for (const f of findingsMap.values()) {
+      if (SEV_RANK[f.severity] < SEV_RANK[best]) best = f.severity;
+    }
+    return best;
+  }, [findingsMap]);
+
+  const badgeColors = highestSeverity ? SEV_BADGE[highestSeverity] : SEV_BADGE.WARNING;
 
   return (
     <div style={s.fileCard}>
@@ -82,10 +107,46 @@ export function FileCard({
           <span style={s.delText}>−{file.deletions}</span>
         </span>
         {findingCount > 0 && (
-          <span style={s.findingBadge}>
-            <Icon.AlertTriangle size={12} />
-            {findingCount}
-          </span>
+          (() => {
+            const badge = (
+              <span style={{ ...s.findingBadge, color: badgeColors.c, background: badgeColors.bg }}>
+                <Icon.AlertTriangle size={12} />
+                {findingCount}
+              </span>
+            );
+            // Show tooltip with top finding (highest severity) if we have full finding data
+            const topFinding = fileFindings?.length
+              ? fileFindings.reduce((best, f) => (SEV_RANK[f.severity as LineFinding["severity"]] < SEV_RANK[best.severity as LineFinding["severity"]] ? f : best))
+              : null;
+            if (!topFinding) return badge;
+            const sev = SEV[topFinding.severity as keyof typeof SEV];
+            return (
+              <Tooltip
+                trigger={badge}
+                width={300}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: sev.c, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {sev.label}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {topFinding.title}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                      {topFinding.file}:{topFinding.start_line}
+                    </span>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>
+                      {Math.round(topFinding.confidence * 100)}% conf
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                    {topFinding.rationale.length > 120 ? topFinding.rationale.slice(0, 120) + "..." : topFinding.rationale}
+                  </div>
+                </div>
+              </Tooltip>
+            );
+          })()
         )}
         {commentCount > 0 && (
           <span
@@ -101,16 +162,22 @@ export function FileCard({
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (
-            lines.map((ln, i) => (
-              <CodeLine
-                key={i}
-                ln={ln}
-                path={file.path}
-                threads={threadsForLine(ln, matched)}
-                commenting={commenting}
-                highlight={!!findingSet && ln.newNo !== undefined && findingSet.has(ln.newNo)}
-              />
-            ))
+            lines.map((ln, i) => {
+              const lineFinding = ln.newNo !== undefined
+                ? findingsMap?.get(ln.newNo) ??
+                  (findingSet?.has(ln.newNo) ? { severity: "WARNING" as const, title: "" } : undefined)
+                : undefined;
+              return (
+                <CodeLine
+                  key={i}
+                  ln={ln}
+                  path={file.path}
+                  threads={threadsForLine(ln, matched)}
+                  commenting={commenting}
+                  finding={lineFinding}
+                />
+              );
+            })
           )}
           {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
         </div>

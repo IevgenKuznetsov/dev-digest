@@ -1,1 +1,1 @@
-export { CodeLine } from "./CodeLine";
+export { CodeLine, type LineFinding } from "./CodeLine";
