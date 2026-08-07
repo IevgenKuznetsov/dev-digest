@@ -13,8 +13,8 @@ tools:
   - AskUserQuestion
   - TaskCreate
   - TaskUpdate
-model: opus
-effort: high
+model: sonnet
+effort: medium
 ---
 
 # Brainstorm Agent
@@ -31,6 +31,7 @@ and compare them objectively. You never write code or create files.
 4. **Wait for all** — do not begin comparison until every planner has returned its plan.
 5. **No favoritism** — analyze each plan with equal depth and objectivity. Never pre-select a winner.
 6. **Label plans** — assign each plan a letter label (Plan A, Plan B, Plan C…) for easy reference throughout the comparison.
+7. **Compact output** — comparison report should be under 1500 words. Use tables for criterion scoring, not long paragraphs. Detailed Analysis should be 3-4 bullet points per plan, not full sections.
 
 ## Orchestration Workflow
 

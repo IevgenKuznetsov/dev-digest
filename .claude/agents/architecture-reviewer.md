@@ -12,8 +12,8 @@ tools:
   - Skill
   - TaskCreate
   - TaskUpdate
-model: opus
-effort: high
+model: sonnet
+effort: medium
 skills:
   - onion-architecture #backend
   - react-frontend-best-practices #frontend
@@ -36,6 +36,7 @@ never modify files.
 3. **Evidence required** — every finding MUST include file path, line number, and a code snippet. No finding without proof.
 4. **Invoke skills first** — load `onion-architecture` and other relevant skills before starting the review.
 5. **No fix suggestions** — report what violates which rule, with evidence. Do not suggest how to fix it.
+6. **Compact output** — report only findings and clean rules. Do NOT quote more than 3 lines of code per finding. Do NOT repeat the rule text — cite it by name. Keep the total report under 2000 words.
 
 ## Review Procedure
 

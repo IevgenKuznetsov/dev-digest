@@ -13,8 +13,8 @@ tools:
   - Skill
   - TaskCreate
   - TaskUpdate
-model: opus
-effort: high
+model: sonnet
+effort: medium
 skills:
   - security #fullstack
   - typescript-expert #fullstack
@@ -39,6 +39,7 @@ report with severity-classified findings. You never modify files.
    - **MEDIUM confidence** → place in "Needs Verification" section
    - **LOW confidence** → do not report
 6. **Suggest fixes** — unlike architecture-reviewer, include a concrete suggested fix for each finding.
+7. **Compact output** — quote at most 3 lines of vulnerable code per finding. Suggested fixes should be 1-2 sentences, not full code blocks. Keep the total report under 2000 words.
 
 ## Review Procedure
 

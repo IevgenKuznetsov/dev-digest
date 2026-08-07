@@ -4,14 +4,14 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 | Agent | Model | Effort | Purpose |
 |-------|-------|--------|---------|
-| [researcher](#researcher) | opus | default | Find and synthesize information from repo and web |
+| [researcher](#researcher) | sonnet | medium | Find and synthesize information from repo and web |
 | [planner](#planner) | opus | high | Design implementation plans → `docs/<Feature>_plan.md` |
-| [brainstorm](#brainstorm) | opus | high | Spawn N planners in parallel, compare approaches with pros/cons |
+| [brainstorm](#brainstorm) | sonnet | medium | Spawn N planners in parallel, compare approaches with pros/cons |
 | [implementor](#implementor) | sonnet | medium | Execute `.spec.md` plans step by step |
 | [test-writer](#test-writer) | sonnet | medium | Write unit and integration tests |
-| [architecture-reviewer](#architecture-reviewer) | opus | high | READ-ONLY check of architecture boundaries per module |
-| [security-reviewer](#security-reviewer) | opus | high | READ-ONLY security scan of branch diff with severity report |
-| [plan-verifier](#plan-verifier) | opus | high | READ-ONLY point-by-point verification of plan vs implementation |
+| [architecture-reviewer](#architecture-reviewer) | sonnet | medium | READ-ONLY check of architecture boundaries per module |
+| [security-reviewer](#security-reviewer) | sonnet | medium | READ-ONLY security scan of branch diff with severity report |
+| [plan-verifier](#plan-verifier) | sonnet | medium | READ-ONLY point-by-point verification of plan vs implementation |
 | [doc-writer](#doc-writer) | sonnet | medium | Write documentation with Mermaid diagrams |
 
 ---
@@ -285,22 +285,27 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 ## Pipeline Flow
 
 ```
-Core pipeline:    researcher ──findings──> planner ──plan──> implementor ──report──> user
-                                              │                    │
-                                              └── delegates ───────┘ stops if plan is wrong
+Optimized pipeline:   planner (self-explores) ──plan──> implementor ──report──> user
+                                                  │                    │
+                                                  └── delegates ───────┘ stops if plan is wrong
 
-Orchestration:    brainstorm ──spawns N──> planner (×N) ──plans──> brainstorm ──comparison──> user
+Optional research:    planner ──delegates──> researcher (only for genuinely unknown domains)
 
-Quality gates:    architecture-reviewer ──findings──> user
-                  security-reviewer ──findings──> user
-                  plan-verifier ──checklist──> user
+Orchestration:        brainstorm ──spawns N──> planner (×N) ──plans──> brainstorm ──comparison──> user
 
-Support:          test-writer ──test files──> test results
-                  doc-writer ──docs──> user
+Quality gates:        architecture-reviewer ──findings──> user     (sonnet, compact output)
+                      security-reviewer ──findings──> user         (sonnet, compact output)
+                      plan-verifier ──checklist──> user             (sonnet, compact output)
+
+Support:              test-writer ──test files──> test results
+                      doc-writer ──docs──> user
 ```
 
-The planner presents plans as text for user review (never writes files). The brainstorm
-agent orchestrates multiple planners in parallel and compares their outputs. The implementor
-executes approved plans. Quality gates (architecture-reviewer, security-reviewer, plan-verifier)
-are read-only and run on demand. Support agents (test-writer, doc-writer) produce artifacts
-independently.
+The planner explores the codebase directly (no separate Explore agent needed) and presents
+plans as text for user review. Researcher is only spawned for genuinely unknown domains.
+The implementor executes approved plans. Quality gates (architecture-reviewer, security-reviewer,
+plan-verifier) run on sonnet with compact output (under 2000 words each) to minimize token
+usage. Support agents (test-writer, doc-writer) produce artifacts independently.
+
+**Token optimization:** Only planner and implementor use opus-class models. All reviewers,
+researcher, and brainstorm use sonnet with medium effort. Output caps prevent verbose reports.
