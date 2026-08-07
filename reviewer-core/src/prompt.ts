@@ -84,9 +84,23 @@ export interface PromptParts {
   task?: string;
 }
 
+/** Metadata for one prompt section — safe to log (no content, only dimensions). */
+export interface PromptSectionMeta {
+  /** Human-readable section name (e.g. "diff", "pr_description", "skills"). */
+  name: string;
+  /** Where the content came from (e.g. "pr_body", "agent_config", "repo_intel"). */
+  source: string;
+  /** Character count of the section's content (0 when omitted). */
+  char_len: number;
+  /** Whether the section was included in the final prompt. */
+  included: boolean;
+}
+
 export interface AssembledPrompt {
   messages: ChatMessage[];
   assembly: PromptAssemblyWithIntent;
+  /** Per-section metadata — safe to log; contains no content. */
+  sections: PromptSectionMeta[];
 }
 
 /**
@@ -153,5 +167,17 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     user,
   };
 
-  return { messages, assembly };
+  const sections: PromptSectionMeta[] = [
+    { name: 'system', source: 'agent_config', char_len: system.length, included: true },
+    { name: 'pr_description', source: 'pr_body', char_len: prDescription?.length ?? 0, included: !!prDescription },
+    { name: 'pr_intent', source: 'intent_classifier', char_len: parts.prIntent?.length ?? 0, included: !!parts.prIntent?.trim() },
+    { name: 'skills', source: 'agent_skills', char_len: skillsBlock?.length ?? 0, included: !!skillsBlock },
+    { name: 'memory', source: 'memory_store', char_len: memoryBlock?.length ?? 0, included: !!memoryBlock },
+    { name: 'repo_map', source: 'repo_intel', char_len: parts.repoMap?.length ?? 0, included: !!(parts.repoMap?.trim()) },
+    { name: 'specs', source: 'spec_files', char_len: specsBlock?.length ?? 0, included: !!specsBlock },
+    { name: 'callers', source: 'repo_intel', char_len: parts.callers?.length ?? 0, included: !!(parts.callers?.trim()) },
+    { name: 'diff', source: 'git_diff', char_len: parts.diff.length, included: true },
+  ];
+
+  return { messages, assembly, sections };
 }

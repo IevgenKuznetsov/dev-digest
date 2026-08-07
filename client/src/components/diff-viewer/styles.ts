@@ -31,6 +31,17 @@ export const s = {
   fileStat: { fontSize: 12 } satisfies CSSProperties,
   addText: { color: "var(--code-add-text)" } satisfies CSSProperties,
   delText: { color: "var(--code-del-text)" } satisfies CSSProperties,
+  findingBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    color: "var(--sev-warning)",
+    background: "var(--sev-warning-bg)",
+    borderRadius: 10,
+    padding: "1px 8px",
+  } satisfies CSSProperties,
   fileBody: {
     borderTop: "1px solid var(--border)",
     padding: "8px 0",
@@ -75,10 +86,18 @@ export function chevronFor(open: boolean): CSSProperties {
   };
 }
 
-/** Row background per line kind (add/del tinted, others transparent). */
-export function lineRowFor(kind: Line["kind"]): CSSProperties {
+/** Row background per line kind (add/del tinted, others transparent).
+ *  When `highlight` is true, a finding-highlight border is added. */
+export function lineRowFor(kind: Line["kind"], highlight?: boolean): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
-  return { display: "flex", alignItems: "stretch", fontSize: 13, lineHeight: "20px", background };
+  return {
+    display: "flex",
+    alignItems: "stretch",
+    fontSize: 13,
+    lineHeight: "20px",
+    background: highlight ? "var(--sev-warning-bg)" : background,
+    borderLeft: highlight ? "3px solid var(--sev-warning)" : "3px solid transparent",
+  };
 }
 
 /** Gutter sign colour per line kind. */

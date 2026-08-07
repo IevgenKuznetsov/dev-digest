@@ -7,7 +7,9 @@ import type {
   Severity,
   FindingCategory,
   FindingKind,
+  SmartDiff,
 } from '@devdigest/shared';
+import { buildSmartDiff } from './classifier.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import * as t from '../../db/schema.js';
 import { NotFoundError, AppError } from '../../platform/errors.js';
@@ -385,6 +387,42 @@ export class PullsService {
       const msg = err instanceof Error ? err.message : 'Failed to post the comment to GitHub.';
       throw new AppError('github_comment_failed', msg, 400, { cause: String(err) });
     }
+  }
+
+  async getSmartDiff(workspaceId: string, prId: string): Promise<SmartDiff> {
+    await this.resolvePrAndRepo(prId, workspaceId);
+
+    const files = await this.container.db
+      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions })
+      .from(t.prFiles)
+      .where(eq(t.prFiles.prId, prId));
+
+    if (files.length === 0) throw new NotFoundError('No files found for this pull request');
+
+    // Fetch findings from the latest review (kind = 'review') if any.
+    const [latestReview] = await this.container.db
+      .select({ id: t.reviews.id })
+      .from(t.reviews)
+      .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, 'review')))
+      .orderBy(desc(t.reviews.createdAt))
+      .limit(1);
+
+    const findingsByFile = new Map<string, number[]>();
+
+    if (latestReview) {
+      const findingRows = await this.container.db
+        .select({ file: t.findings.file, startLine: t.findings.startLine })
+        .from(t.findings)
+        .where(eq(t.findings.reviewId, latestReview.id));
+
+      for (const row of findingRows) {
+        const lines = findingsByFile.get(row.file) ?? [];
+        lines.push(row.startLine);
+        findingsByFile.set(row.file, lines);
+      }
+    }
+
+    return buildSmartDiff(files, findingsByFile);
   }
 
   private async resolvePrAndRepo(prId: string, workspaceId: string) {

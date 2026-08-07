@@ -160,6 +160,8 @@ export default function PRDetailPage() {
               // Intent is classified as pre-work during the review run —
               // invalidate the cached 404 so IntentCard picks it up.
               if (prId) qc.invalidateQueries({ queryKey: ["pr-intent", prId] });
+              // Smart Diff finding_lines update when a review finishes.
+              if (prId) qc.invalidateQueries({ queryKey: ["smart-diff", prId] });
             }}
           />
         )}

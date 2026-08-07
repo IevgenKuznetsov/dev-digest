@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import type { PrMetaFindings, PrDetail, PrReviewComment } from '@devdigest/shared';
+import type { PrMetaFindings, PrDetail, PrReviewComment, SmartDiff } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
@@ -28,6 +28,11 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
   app.get('/pulls/:id', { schema: { params: IdParams } }, async (req): Promise<PrDetail> => {
     const { workspaceId } = await getContext(app.container, req);
     return service.getDetail(workspaceId, req.params.id);
+  });
+
+  app.get('/pulls/:id/smart-diff', { schema: { params: IdParams } }, async (req): Promise<SmartDiff> => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.getSmartDiff(workspaceId, req.params.id);
   });
 
   // ---- Inline review comments (Files changed tab) -------------------------

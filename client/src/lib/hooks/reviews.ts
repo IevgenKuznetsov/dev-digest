@@ -14,6 +14,7 @@ import type {
   ReviewRunResponse,
   RunEvent,
   RunSummaryCost,
+  SmartDiff,
 } from "@devdigest/shared";
 
 // ---- PR Intent (Intent Layer) ----
@@ -247,4 +248,18 @@ export function useRunEvents(runIds: string[]) {
   }, [key]);
 
   return { events, running };
+}
+
+// ---- Smart Diff ----
+
+/** Fetch the Smart Diff classification for a PR (file-role grouping + finding lines). */
+export function useSmartDiff(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["smart-diff", prId],
+    queryFn: () => api.get<SmartDiff>(`/pulls/${prId}/smart-diff`),
+    enabled: !!prId,
+    // Classification only changes when PR files change or a new review runs —
+    // 30 s staleness avoids hammering the classifier on every tab switch.
+    staleTime: 30_000,
+  });
 }

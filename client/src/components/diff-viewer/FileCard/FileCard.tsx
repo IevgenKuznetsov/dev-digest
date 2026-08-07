@@ -30,10 +30,21 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+export function FileCard({
+  file,
+  commenting,
+  defaultExpanded,
+  findingLines,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  defaultExpanded?: boolean;
+  /** Line numbers (new-side) that have findings — highlighted in the diff. */
+  findingLines?: number[];
+}) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
-    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
+    defaultExpanded ?? (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
@@ -52,6 +63,12 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
     ? commenting.comments.filter((c) => c.path === file.path).length
     : 0;
 
+  const findingSet = React.useMemo(
+    () => (findingLines?.length ? new Set(findingLines) : null),
+    [findingLines],
+  );
+  const findingCount = findingLines?.length ?? 0;
+
   return (
     <div style={s.fileCard}>
       <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
@@ -64,6 +81,12 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
         </span>
+        {findingCount > 0 && (
+          <span style={s.findingBadge}>
+            <Icon.AlertTriangle size={12} />
+            {findingCount}
+          </span>
+        )}
         {commentCount > 0 && (
           <span
             style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-muted)" }}
@@ -85,6 +108,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                highlight={!!findingSet && ln.newNo !== undefined && findingSet.has(ln.newNo)}
               />
             ))
           )}

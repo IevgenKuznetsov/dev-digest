@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
 import type { Provider, Review, RunTrace, RunStatsCost, UnifiedDiff, EnrichedIntent } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers, filterByScope } from '@devdigest/reviewer-core';
+import { reviewPullRequest, countBlockers, filterByScope, type PromptSectionMeta } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -237,6 +237,9 @@ export class ReviewRunExecutor {
       });
       const { tokensIn, tokensOut, grounding } = outcome;
 
+      // ---- Prompt composition log (safe — no content, only dimensions) -------
+      this.logPromptComposition(outcome.sections, runId, agent, runLog);
+
       // Apply scope filter post-grounding when intent is available.
       // CRITICAL findings are never filtered; WARNINGs are annotated; SUGGESTIONs demoted.
       let keptFindings = outcome.review.findings;
@@ -436,6 +439,45 @@ export class ReviewRunExecutor {
       return `\n\n${hot.length} of ${changedFiles.length} changed file(s) are in the top 5% most-depended-on (high blast risk) — prioritise their correctness.`;
     } catch {
       return '';
+    }
+  }
+
+  /**
+   * Log prompt composition metadata — section names, sources, and char lengths.
+   * Never logs content, secrets, full diffs, or spec bodies. When
+   * PROMPT_LOG_VERBOSE=true, emits one event per section; otherwise a single
+   * summary line.
+   */
+  private logPromptComposition(
+    sections: PromptSectionMeta[],
+    runId: string,
+    agent: AgentRow,
+    runLog: RunLogger,
+  ): void {
+    const included = sections.filter((s) => s.included);
+    const totalChars = included.reduce((sum, s) => sum + s.char_len, 0);
+
+    // Always: one compact summary line.
+    runLog.info('Prompt composed', {
+      correlation_id: runId,
+      model: agent.model,
+      provider: agent.provider,
+      sections_included: included.length,
+      sections_total: sections.length,
+      total_chars: totalChars,
+    });
+
+    // Verbose: per-section breakdown (local debugging only).
+    if (this.container.config.promptLogVerbose) {
+      for (const s of sections) {
+        runLog.tool(`  section "${s.name}" — source=${s.source}, chars=${s.char_len}, included=${s.included}`, {
+          correlation_id: runId,
+          section: s.name,
+          source: s.source,
+          char_len: s.char_len,
+          included: s.included,
+        });
+      }
     }
   }
 

@@ -36,6 +36,9 @@ const EnvSchema = z.object({
     (v) => (v === '' ? undefined : v),
     z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   ),
+  // When true, logs per-section prompt composition detail (name, source, char_len).
+  // Off by default — set PROMPT_LOG_VERBOSE=true locally to debug prompt sizing.
+  PROMPT_LOG_VERBOSE: z.string().optional(),
 });
 
 export type AppConfig = {
@@ -59,6 +62,8 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /** When true, logs per-section prompt composition detail (char lengths, sources). */
+  promptLogVerbose: boolean;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -77,5 +82,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    promptLogVerbose: parsed.PROMPT_LOG_VERBOSE === 'true',
   };
 }
