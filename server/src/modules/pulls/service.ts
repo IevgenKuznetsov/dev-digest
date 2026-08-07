@@ -7,7 +7,9 @@ import type {
   Severity,
   FindingCategory,
   FindingKind,
+  SmartDiff,
 } from '@devdigest/shared';
+import { buildSmartDiff } from './classifier.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import * as t from '../../db/schema.js';
 import { NotFoundError, AppError } from '../../platform/errors.js';
@@ -385,6 +387,50 @@ export class PullsService {
       const msg = err instanceof Error ? err.message : 'Failed to post the comment to GitHub.';
       throw new AppError('github_comment_failed', msg, 400, { cause: String(err) });
     }
+  }
+
+  async getSmartDiff(workspaceId: string, prId: string): Promise<SmartDiff> {
+    await this.resolvePrAndRepo(prId, workspaceId);
+
+    const files = await this.container.db
+      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions })
+      .from(t.prFiles)
+      .where(eq(t.prFiles.prId, prId));
+
+    if (files.length === 0) throw new NotFoundError('No files found for this pull request');
+
+    // Fetch findings from the latest review per agent (kind = 'review').
+    // This ensures Smart Diff shows findings from ALL agents, not just the most recent single run.
+    const allReviews = await this.container.db
+      .select({ id: t.reviews.id, agentId: t.reviews.agentId, createdAt: t.reviews.createdAt })
+      .from(t.reviews)
+      .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, 'review')))
+      .orderBy(desc(t.reviews.createdAt));
+
+    // Keep only the latest review per agent (or per null agentId as a single group)
+    const latestByAgent = new Map<string, string>();
+    for (const r of allReviews) {
+      const key = r.agentId ?? '__no_agent__';
+      if (!latestByAgent.has(key)) latestByAgent.set(key, r.id);
+    }
+    const reviewIds = [...latestByAgent.values()];
+
+    const findingsByFile = new Map<string, number[]>();
+
+    if (reviewIds.length > 0) {
+      const findingRows = await this.container.db
+        .select({ file: t.findings.file, startLine: t.findings.startLine, endLine: t.findings.endLine })
+        .from(t.findings)
+        .where(inArray(t.findings.reviewId, reviewIds));
+
+      for (const row of findingRows) {
+        const lines = findingsByFile.get(row.file) ?? [];
+        for (let l = row.startLine; l <= row.endLine; l++) lines.push(l);
+        findingsByFile.set(row.file, lines);
+      }
+    }
+
+    return buildSmartDiff(files, findingsByFile);
   }
 
   private async resolvePrAndRepo(prId: string, workspaceId: string) {

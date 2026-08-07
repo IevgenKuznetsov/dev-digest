@@ -76,6 +76,13 @@ export default function PRDetailPage() {
   const lethalTrifecta = allFindings.filter((f) => f.kind === "lethal_trifecta");
   const findingsCount = allFindings.length;
 
+  // Finding badge click → switch to findings tab + highlight the finding
+  const [highlightFinding, setHighlightFinding] = React.useState<{ findingId: string; nonce: number } | null>(null);
+  const handleFindingClick = React.useCallback((findingId: string) => {
+    setTab("findings");
+    setHighlightFinding({ findingId, nonce: Date.now() });
+  }, [setTab]);
+
   const repoName = activeRepo?.full_name ?? repoId;
   // The real "owner/repo" (null until the repo is loaded) — used to build
   // github.com deep-links for the header and finding file references.
@@ -134,7 +141,7 @@ export default function PRDetailPage() {
       />
 
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
-        {tab === "overview" && <OverviewTab prBody={pr.body} />}
+        {tab === "overview" && <OverviewTab prBody={pr.body} prId={prId} />}
 
         {tab === "findings" && (
           <FindingsTab
@@ -148,6 +155,7 @@ export default function PRDetailPage() {
             repoFullName={repoFullName}
             headSha={pr.head_sha}
             cancelMutation={cancel}
+            highlightFinding={highlightFinding}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
               if (window.confirm("Delete this run from history? (its logs are removed too)"))
@@ -157,6 +165,11 @@ export default function PRDetailPage() {
               invalidateActiveRuns();
               invalidateRunHistory();
               refetchReviews();
+              // Intent is classified as pre-work during the review run —
+              // invalidate the cached 404 so IntentCard picks it up.
+              if (prId) qc.invalidateQueries({ queryKey: ["pr-intent", prId] });
+              // Smart Diff finding_lines update when a review finishes.
+              if (prId) qc.invalidateQueries({ queryKey: ["smart-diff", prId] });
             }}
           />
         )}
@@ -167,6 +180,7 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            onFindingClick={handleFindingClick}
           />
         )}
       </div>

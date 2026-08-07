@@ -1,6 +1,13 @@
 import type { CSSProperties } from "react";
 import type { Line } from "./helpers";
 
+/** Severity → CSS variable pair for line highlighting. */
+const SEV_COLORS: Record<string, { c: string; bg: string }> = {
+  CRITICAL:   { c: "var(--crit)", bg: "var(--crit-bg)" },
+  WARNING:    { c: "var(--warn)", bg: "var(--warn-bg)" },
+  SUGGESTION: { c: "var(--sugg)", bg: "var(--sugg-bg)" },
+};
+
 /** Co-located styles for the DiffViewer (extracted from inline styles). */
 export const s = {
   list: { display: "flex", flexDirection: "column", gap: 10 } satisfies CSSProperties,
@@ -31,6 +38,17 @@ export const s = {
   fileStat: { fontSize: 12 } satisfies CSSProperties,
   addText: { color: "var(--code-add-text)" } satisfies CSSProperties,
   delText: { color: "var(--code-del-text)" } satisfies CSSProperties,
+  findingBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    color: "var(--warn)",
+    background: "var(--warn-bg)",
+    borderRadius: 10,
+    padding: "1px 8px",
+  } satisfies CSSProperties,
   fileBody: {
     borderTop: "1px solid var(--border)",
     padding: "8px 0",
@@ -64,6 +82,35 @@ export const s = {
     color: "var(--text-primary)",
     paddingRight: 12,
   } satisfies CSSProperties,
+  findingAnnotation: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: "auto",
+    paddingRight: 12,
+    paddingLeft: 12,
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    maxWidth: 320,
+  } satisfies CSSProperties,
+
+  findingDot: (severity: string): CSSProperties => ({
+    width: 7,
+    height: 7,
+    borderRadius: 99,
+    flexShrink: 0,
+    background: SEV_COLORS[severity]?.c ?? "var(--warn)",
+  }),
+
+  findingLabel: {
+    fontSize: 11,
+    fontWeight: 500,
+    color: "var(--text-muted)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
 } as const;
 
 /** Chevron rotates 90deg when the file card is open. */
@@ -75,10 +122,19 @@ export function chevronFor(open: boolean): CSSProperties {
   };
 }
 
-/** Row background per line kind (add/del tinted, others transparent). */
-export function lineRowFor(kind: Line["kind"]): CSSProperties {
+/** Row background per line kind (add/del tinted, others transparent).
+ *  When `severity` is provided, the row is highlighted with severity-specific colours. */
+export function lineRowFor(kind: Line["kind"], severity?: string): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
-  return { display: "flex", alignItems: "stretch", fontSize: 13, lineHeight: "20px", background };
+  const sev = severity ? SEV_COLORS[severity] : null;
+  return {
+    display: "flex",
+    alignItems: "stretch",
+    fontSize: 13,
+    lineHeight: "20px",
+    background: sev ? sev.bg : background,
+    borderLeft: sev ? `3px solid ${sev.c}` : "3px solid transparent",
+  };
 }
 
 /** Gutter sign colour per line kind. */

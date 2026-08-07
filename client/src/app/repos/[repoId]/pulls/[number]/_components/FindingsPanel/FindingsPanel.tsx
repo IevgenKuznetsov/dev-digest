@@ -17,11 +17,14 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  targetFindingId,
 }: {
   findings: FindingRecord[];
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** When set, the matching FindingCard auto-expands, scrolls into view, and highlights. */
+  targetFindingId?: string | null;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -29,6 +32,16 @@ export function FindingsPanel({
   const [focusIdx, setFocusIdx] = React.useState(0);
 
   const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+
+  // When a target finding is set, scroll it into view after render
+  React.useEffect(() => {
+    if (!targetFindingId) return;
+    // Use requestAnimationFrame to ensure the DOM is updated after expand
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-finding-id="${CSS.escape(targetFindingId)}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [targetFindingId]);
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {
@@ -67,6 +80,7 @@ export function FindingsPanel({
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}
+              highlighted={f.id === targetFindingId}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
             />
           ))

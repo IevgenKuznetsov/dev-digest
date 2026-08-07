@@ -24,6 +24,8 @@ interface FindingsTabProps {
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
+  /** Set by the diff tab when a finding badge is clicked — resolves to the correct run + finding. */
+  highlightFinding?: { findingId: string; nonce: number } | null;
 }
 
 export function FindingsTab({
@@ -40,6 +42,7 @@ export function FindingsTab({
   onOpenTrace,
   onDelete,
   onRunDone,
+  highlightFinding,
 }: FindingsTabProps) {
   const handleCancelAll = useCallback(() => {
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
@@ -66,10 +69,23 @@ export function FindingsTab({
   // Timeline → Review-runs navigation: clicking an agent name in the timeline
   // opens + scrolls to that run's accordion below. The nonce re-triggers the
   // scroll even when the same run is clicked twice.
-  const [target, setTarget] = React.useState<{ runId: string; n: number } | null>(null);
+  const [target, setTarget] = React.useState<{ runId: string; n: number; findingId?: string } | null>(null);
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // When highlightFinding is set (from diff tab badge click), resolve the finding
+  // to its parent review's run_id and set target with findingId
+  React.useEffect(() => {
+    if (!highlightFinding) return;
+    const { findingId, nonce } = highlightFinding;
+    for (const review of runs) {
+      if (review.findings.some((f) => f.id === findingId) && review.run_id) {
+        setTarget({ runId: review.run_id, n: nonce, findingId });
+        return;
+      }
+    }
+  }, [highlightFinding, runs]);
 
   return (
     <section>
@@ -165,6 +181,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            targetFindingId={target?.findingId ?? null}
           />
         ))
       )}

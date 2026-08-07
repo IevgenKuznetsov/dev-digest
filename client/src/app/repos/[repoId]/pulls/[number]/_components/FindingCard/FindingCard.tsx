@@ -31,6 +31,7 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
+  highlighted,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -39,10 +40,22 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** When true, the card shows a temporary glow highlight (auto-clears after 2s). */
+  highlighted?: boolean;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
+  const [glowing, setGlowing] = React.useState(false);
   const sevColor = SEV_COLOR[f.severity] ?? SEV_COLOR_FALLBACK;
+
+  // When highlighted externally, auto-expand and show a temporary glow
+  React.useEffect(() => {
+    if (!highlighted) return;
+    setExpanded(true);
+    setGlowing(true);
+    const timer = setTimeout(() => setGlowing(false), 2000);
+    return () => clearTimeout(timer);
+  }, [highlighted]);
   const fileHref =
     repoFullName && headSha
       ? githubBlobUrl(repoFullName, headSha, f.file, f.start_line, f.end_line)
@@ -52,7 +65,10 @@ export function FindingCard({
   const muted = accepted || dismissed;
 
   return (
-    <div data-finding-id={f.id} style={s.card(!!focused, sevColor, muted)}>
+    <div data-finding-id={f.id} style={{
+      ...s.card(!!focused || glowing, sevColor, muted),
+      ...(glowing ? { boxShadow: `0 0 0 2px ${sevColor}, 0 0 12px ${sevColor}40` } : {}),
+    }}>
       <div
         role="button"
         tabIndex={0}
