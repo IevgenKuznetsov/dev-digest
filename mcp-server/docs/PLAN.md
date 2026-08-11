@@ -7,6 +7,95 @@
 
 DevDigest needs an MCP (Model Context Protocol) server so Claude Code and other MCP clients can interact with DevDigest programmatically. The MCP server is a stdio-based process that acts as an HTTP client, calling the existing DevDigest API on :3001. It exposes 5 tools: `list_agents`, `run_agent_on_pr`, `get_findings`, `get_conventions`, `get_blast_radius`.
 
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+    subgraph Client["MCP Client (Claude Code / Claude Desktop)"]
+        LLM["LLM Context"]
+        ToolDefs["Tool Definitions<br/>~500-750 tokens"]
+    end
+
+    subgraph MCP["mcp-server/ (stdio process)"]
+        Transport["StdioServerTransport<br/>stdin/stdout JSON-RPC"]
+        McpSrv["McpServer"]
+        
+        subgraph Tools["tools.ts — 5 Registered Tools"]
+            T1["list_agents"]
+            T2["run_agent_on_pr"]
+            T3["get_findings"]
+            T4["get_conventions"]
+            T5["get_blast_radius<br/>(placeholder)"]
+        end
+        
+        Poll["poll.ts<br/>pollUntilDone()"]
+        ApiClient["api-client.ts<br/>DevDigestClient"]
+        Types["types.ts<br/>Minimal interfaces"]
+    end
+
+    subgraph Server["@devdigest/api (:3001)"]
+        AgentsAPI["GET /agents"]
+        ReviewAPI["POST /pulls/:id/review"]
+        RunsAPI["GET /pulls/:id/runs/active"]
+        ReviewsAPI["GET /pulls/:id/reviews"]
+        ConvAPI["GET /repos/:id/conventions"]
+        BlastAPI["GET /pulls/:id/blast<br/>(not yet built)"]
+    end
+
+    subgraph DB["PostgreSQL"]
+        Tables["agents, pull_requests,<br/>reviews, findings,<br/>conventions, pr_brief"]
+    end
+
+    LLM -- "tool_call (JSON-RPC)" --> Transport
+    Transport --> McpSrv
+    McpSrv --> Tools
+    ToolDefs -. "injected at session start" .-> LLM
+
+    T1 --> ApiClient
+    T2 --> Poll
+    Poll --> ApiClient
+    T3 --> ApiClient
+    T4 --> ApiClient
+    T5 -. "placeholder" .-> ApiClient
+
+    ApiClient -- "HTTP fetch()" --> AgentsAPI
+    ApiClient -- "HTTP fetch()" --> ReviewAPI
+    ApiClient -- "HTTP fetch()" --> RunsAPI
+    ApiClient -- "HTTP fetch()" --> ReviewsAPI
+    ApiClient -- "HTTP fetch()" --> ConvAPI
+    ApiClient -. "future" .-> BlastAPI
+
+    AgentsAPI --> Tables
+    ReviewAPI --> Tables
+    RunsAPI --> Tables
+    ReviewsAPI --> Tables
+    ConvAPI --> Tables
+    BlastAPI -. "future" .-> Tables
+```
+
+### Sequence: `run_agent_on_pr` (polling flow)
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant MCP as MCP Server (stdio)
+    participant API as DevDigest API (:3001)
+
+    CC->>MCP: tool_call: run_agent_on_pr(pr_id, agent_id)
+    MCP->>API: POST /pulls/:id/review {agentId}
+    API-->>MCP: 200 {run_id}
+    
+    loop Poll every 3s (max 5 min)
+        MCP->>API: GET /pulls/:id/runs/active
+        API-->>MCP: [{run_id, status}]
+        Note over MCP: Check if status != "running"
+    end
+    
+    MCP->>API: GET /pulls/:id/reviews
+    API-->>MCP: [{id, verdict, score, findings, ...}]
+    MCP-->>CC: tool_result: {review summary + findings}
+```
+
 ## Resolved Decisions
 
 - **Large response truncation:** Truncate to top 20 most valuable findings sorted by severity
@@ -234,6 +323,35 @@ mcp-server/
 3. **ESM import paths** -- Must use `.js` extensions consistently.
 4. **Large tool responses** -- Findings truncated to top 20 by severity.
 5. **Blast radius not available** -- Placeholder returns clear message. Will be linked when server endpoint is built.
+
+## Best Practices Applied
+
+### From MCP Research (token efficiency)
+| Practice | Source | How Applied |
+|----------|--------|-------------|
+| Schema is #1 token driver (97% of tokens) | [mcp-token-benchmark](https://github.com/zhang-liz/mcp-token-benchmark) | Flat schemas, no nesting, no field descriptions |
+| Descriptions ≤200 chars | [Context optimization study](https://scottspence.com/posts/optimising-mcp-server-context-usage-in-claude-code) | All 5 tool descriptions are 1 short sentence |
+| No `outputSchema` | [Token optimization guide](https://www.stackone.com/blog/mcp-token-optimization/) | Omitted entirely — halves per-tool token cost |
+| Deterministic tool order | [MCP Tools Spec](https://modelcontextprotocol.io/docs/concepts/tools) | Tools registered in fixed order for prompt cache hits |
+| Use annotations over prose | [MCP Tool Annotations](https://mcpblog.dev/blog/2026-03-13-mcp-tool-annotations) | `readOnlyHint`, `destructiveHint` instead of describing behavior in text |
+| Short `verb_noun` names ≤20 chars | [Schema Design Guide](https://kansei-link.com/en/insights/mcp-tool-schema-design-guide-2026.html) | `list_agents` (11), `get_findings` (12), etc. |
+| `isError: true` for tool failures | [Anthropic MCP Server Guide](https://github.com/anthropics/skills/blob/main/skills/mcp-builder/reference/node_mcp_server.md) | Protocol errors invisible to LLM; tool-level errors are visible |
+| stdio transport for local client | [MCP Architecture](https://modelcontextprotocol.io/docs/concepts/architecture) | Single-client, zero network overhead |
+
+### From Project Conventions
+| Practice | Source | How Applied |
+|----------|--------|-------------|
+| Never edit existing `vendor/shared/` | Root `CLAUDE.md` | Local `types.ts` with minimal interfaces instead |
+| Separate lockfiles per package | Root `CLAUDE.md` | Own `package.json` with npm |
+| ESM throughout | Root `CLAUDE.md` | `"type": "module"`, `.js` import extensions |
+| Integration tests use `*.it.test.ts` | Root `CLAUDE.md` | Test files follow this suffix convention |
+
+### Architecture Decision: No Onion Layers
+The DevDigest server uses implicit clean architecture (routes → service → repository + injected adapters). The MCP server intentionally does NOT apply Onion Architecture because:
+- It has no domain logic, no database, no business rules
+- It is a **protocol adapter** — translating MCP tool calls into HTTP requests
+- Adding onion layers (domain, application, infrastructure) would introduce abstraction without value
+- The natural layering is flat: `tools.ts` (handlers) → `api-client.ts` (HTTP) → `types.ts` (contracts)
 
 ## Out of Scope
 
