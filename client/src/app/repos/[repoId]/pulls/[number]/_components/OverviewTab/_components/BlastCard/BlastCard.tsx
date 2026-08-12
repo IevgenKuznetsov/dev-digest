@@ -400,7 +400,7 @@ function TreeView({
         <ul style={s.treeRoot}>
           {bd.symbolsWithCallers.map((sym, i) => (
             <SymbolNode
-              key={i}
+              key={`${sym.file}:${sym.name}`}
               symbol={sym}
               callers={bd.callersBySymbol.get(sym.name) ?? []}
               onFileClick={onFileClick}
@@ -665,7 +665,7 @@ function GraphView({
     <div ref={containerRef} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {bd.symbolsWithCallers.map((sym, idx) => (
         <SymbolGraph
-          key={sym.name}
+          key={`${sym.file}:${sym.name}`}
           symbol={sym}
           callers={bd.callersBySymbol.get(sym.name) ?? []}
           factsByFile={data.facts_by_file}
