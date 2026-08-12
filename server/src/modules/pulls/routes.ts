@@ -35,6 +35,11 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     return service.getSmartDiff(workspaceId, req.params.id);
   });
 
+  app.get('/pulls/:id/blast', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.getBlastForPr(workspaceId, req.params.id);
+  });
+
   // ---- Inline review comments (Files changed tab) -------------------------
   app.get(
     '/pulls/:id/comments',

@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../toast";
 import type {
+  BlastRadiusResponse,
   EnrichedIntent,
   FindingActionKind,
   PrReviewComment,
@@ -251,6 +252,18 @@ export function useRunEvents(runIds: string[]) {
 }
 
 // ---- Smart Diff ----
+
+// ---- Blast Radius ----
+
+/** Fetch the blast radius (changed symbols, callers, impacted endpoints) for a PR. */
+export function useBlastRadius(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["blast-radius", prId],
+    queryFn: () => api.get<BlastRadiusResponse>(`/pulls/${prId}/blast`),
+    enabled: !!prId,
+    staleTime: 30_000,
+  });
+}
 
 /** Fetch the Smart Diff classification for a PR (file-role grouping + finding lines). */
 export function useSmartDiff(prId: string | null | undefined) {

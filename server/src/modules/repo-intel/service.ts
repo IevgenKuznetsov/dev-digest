@@ -33,6 +33,7 @@ import type {
   BlastCallerRow,
   BlastChangedSymbol,
   BlastResult,
+  DegradedReason,
   FileRankRow,
   IndexResult,
   IndexState,
@@ -338,8 +339,23 @@ export class RepoIntelService implements RepoIntel {
       return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
     }
 
-    // Resolved cross-file callers.
-    const callerRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    // Resolved cross-file callers (strict: requires declFile + file_rank).
+    const nameList = [...nameSet];
+    const changedSet = new Set(changedFiles);
+    let callerRows = await this.repo.getResolvedCallers(repoId, changedFiles, nameList);
+
+    // Fallback: if strict query returned nothing (declFile not populated or
+    // file_rank empty), use the simpler getCachedReferencesTo which only needs
+    // the references table. Rank defaults to 0.
+    let usedFallback = false;
+    if (callerRows.length === 0) {
+      const cachedRefs = await this.repo.getCachedReferencesTo(repoId, nameList);
+      callerRows = cachedRefs
+        .filter((r) => !changedSet.has(r.fromPath))
+        .map((r) => ({ fromPath: r.fromPath, toSymbol: r.toSymbol, line: r.line, rank: 0 }));
+      usedFallback = true;
+    }
+
     const callerFiles = [...new Set(callerRows.map((c) => c.fromPath))];
 
     // Enclosing caller symbol from the callers' persistent symbol rows.
@@ -386,7 +402,8 @@ export class RepoIntelService implements RepoIntel {
       callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
       impactedEndpoints: [...endpoints],
       factsByFile,
-      degraded: false,
+      degraded: usedFallback,
+      reason: usedFallback ? 'unranked_callers' as DegradedReason : undefined,
     };
   }
 

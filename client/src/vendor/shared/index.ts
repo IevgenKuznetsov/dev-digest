@@ -28,3 +28,4 @@ export * from './contracts/productionize.js';
 export * from './contracts/run-cost.js';
 export * from './contracts/findings-counts.js';
 export * from './adapters.js';
+export * from './contracts/blast-api.js';

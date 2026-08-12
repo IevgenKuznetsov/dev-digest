@@ -121,8 +121,64 @@ export function registerTools(
     "Get PR influence map (changed symbols and callers)",
     { pr_id: z.string() },
     { readOnlyHint: true },
-    async () => {
-      return textResult("Blast radius analysis is not yet available.");
+    async ({ pr_id }) => {
+      try {
+        const result = await client.getBlastRadius(pr_id);
+
+        const lines: string[] = [];
+
+        if (result.degraded) {
+          const note =
+            result.reason === "no_files"
+              ? "PR files not loaded yet — open the Files tab first"
+              : "Index incomplete — results may be approximate";
+          lines.push(`Note: ${note}`, "");
+        }
+
+        lines.push(`Changed Symbols (${result.changed_symbols.length}):`);
+        if (result.changed_symbols.length === 0) {
+          lines.push("  (none)");
+        } else {
+          for (const sym of result.changed_symbols) {
+            lines.push(`  - ${sym.name} (${sym.kind}) in ${sym.file}`);
+          }
+        }
+
+        lines.push("", `Callers (${result.callers.length}):`);
+        if (result.callers.length === 0) {
+          lines.push("  (none)");
+        } else {
+          // Group by via_symbol
+          const grouped = new Map<string, typeof result.callers>();
+          for (const caller of result.callers) {
+            const group = grouped.get(caller.via_symbol) ?? [];
+            group.push(caller);
+            grouped.set(caller.via_symbol, group);
+          }
+          for (const [viaSymbol, callers] of grouped.entries()) {
+            lines.push(`  Via ${viaSymbol}:`);
+            for (const c of callers) {
+              lines.push(`    - ${c.file}:${c.line}`);
+            }
+          }
+        }
+
+        lines.push(
+          "",
+          `Potentially Affected Endpoints (${result.impacted_endpoints.length}):`
+        );
+        if (result.impacted_endpoints.length === 0) {
+          lines.push("  (none)");
+        } else {
+          for (const ep of result.impacted_endpoints) {
+            lines.push(`  - ${ep}`);
+          }
+        }
+
+        return textResult(lines.join("\n"));
+      } catch (err) {
+        return errorResult(err);
+      }
     }
   );
 }

@@ -1,4 +1,4 @@
-import type { Agent, ReviewRecord, RunSummary, ConventionCandidate } from "./types.js";
+import type { Agent, ReviewRecord, RunSummary, ConventionCandidate, BlastRadiusResult } from "./types.js";
 
 export class DevDigestClient {
   private baseUrl: string;
@@ -58,7 +58,7 @@ export class DevDigestClient {
     );
   }
 
-  getBlastRadius(_prId: string): Promise<{ error: string }> {
-    return Promise.resolve({ error: "not implemented" });
+  getBlastRadius(prId: string): Promise<BlastRadiusResult> {
+    return this.request<BlastRadiusResult>("GET", `/pulls/${prId}/blast`);
   }
 }

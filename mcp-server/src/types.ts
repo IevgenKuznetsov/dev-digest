@@ -35,10 +35,27 @@ export interface ConventionCandidate {
   accepted: boolean;
 }
 
-export interface BlastRadius {
-  changed_symbols: string[];
-  downstream: string[];
-  summary: string;
+export interface BlastChangedSymbol {
+  file: string;
+  name: string;
+  kind: string;
+}
+
+export interface BlastCaller {
+  file: string;
+  symbol: string;
+  via_symbol: string;
+  line: number;
+  rank: number;
+}
+
+export interface BlastRadiusResult {
+  changed_symbols: BlastChangedSymbol[];
+  callers: BlastCaller[];
+  impacted_endpoints: string[];
+  facts_by_file?: Record<string, { endpoints: string[]; crons: string[] }>;
+  degraded?: boolean;
+  reason?: string;
 }
 
 export interface RunSummary {
