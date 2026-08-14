@@ -20,6 +20,7 @@ export interface FindingRecord {
 
 export interface ReviewRecord {
   id: string;
+  run_id: string | null;
   agent_name: string;
   verdict: string;
   summary: string;

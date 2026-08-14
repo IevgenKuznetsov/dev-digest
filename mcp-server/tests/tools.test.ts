@@ -27,8 +27,8 @@ function makeServer() {
 function makeClient(overrides: Partial<DevDigestClient> = {}): DevDigestClient {
   return {
     listAgents: vi.fn().mockResolvedValue([]),
-    runReview: vi.fn().mockResolvedValue({ run_id: "r1" }),
-    getActiveRuns: vi.fn().mockResolvedValue([]),
+    runReview: vi.fn().mockResolvedValue({ runs: [{ run_id: "r1", agent_id: "a1" }] }),
+    getAllRuns: vi.fn().mockResolvedValue([]),
     getReviews: vi.fn().mockResolvedValue([]),
     getConventions: vi.fn().mockResolvedValue([]),
     getBlastRadius: vi.fn().mockResolvedValue({ error: "not implemented" }),
@@ -207,21 +207,27 @@ describe("registerTools", () => {
       expect(result.content[0].text).toBe("Server error");
     });
 
-    it("polls active runs and returns reviews when done", async () => {
+    it("polls runs by ID and returns reviews when done", async () => {
       const { server, handlers } = makeServer();
 
       let pollCalls = 0;
       const reviews = [{ id: "rev1", verdict: "approved", score: 90 }];
 
       const client = makeClient({
-        runReview: vi.fn().mockResolvedValue({ run_id: "r1" }),
-        getActiveRuns: vi.fn().mockImplementation(async () => {
-          pollCalls++;
-          // Return empty on 2nd call (done)
-          if (pollCalls >= 2) return [];
-          return [{ run_id: "r1", status: "running" }];
+        runReview: vi.fn().mockResolvedValue({
+          runs: [{ run_id: "r1", agent_id: "agent-1" }],
         }),
-        getReviews: vi.fn().mockResolvedValue(reviews),
+        getAllRuns: vi.fn().mockImplementation(async () => {
+          pollCalls++;
+          // Return done on 2nd call
+          if (pollCalls >= 2)
+            return [{ run_id: "r1", status: "done", score: 90, findings_count: 1 }];
+          return [{ run_id: "r1", status: "running", score: null, findings_count: 0 }];
+        }),
+        getReviews: vi.fn().mockResolvedValue([
+          ...reviews.map((r) => ({ ...r, run_id: "r1" })),
+          { id: "old-rev", run_id: "old-run", verdict: "stale", score: 50 },
+        ]),
       });
       registerTools(server, client);
 
@@ -230,7 +236,9 @@ describe("registerTools", () => {
         agent_id: "agent-1",
       })) as { content: Array<{ text: string }> };
 
-      expect(JSON.parse(result.content[0].text)).toEqual(reviews);
+      const parsed = JSON.parse(result.content[0].text);
+      // Only the review from this run, not the stale one
+      expect(parsed).toEqual([{ ...reviews[0], run_id: "r1" }]);
       expect(pollCalls).toBeGreaterThanOrEqual(2);
     });
   });

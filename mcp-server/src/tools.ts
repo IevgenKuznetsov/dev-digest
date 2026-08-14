@@ -58,22 +58,35 @@ export function registerTools(
     { destructiveHint: false, idempotentHint: false },
     async ({ pr_id, agent_id }) => {
       try {
-        await client.runReview(pr_id, agent_id);
+        const { runs: startedRuns } = await client.runReview(pr_id, agent_id);
+        const runIds = new Set(startedRuns.map((r) => r.run_id));
+
+        if (runIds.size === 0) {
+          return errorResult("No runs were started");
+        }
 
         const { pollUntilDone } = await import("./poll.js");
 
         await pollUntilDone(
           async () => {
-            const runs = await client.getActiveRuns(pr_id);
-            const stillRunning = runs.some((r) => r.status === "running");
+            const allRuns = await client.getAllRuns(pr_id);
+            const tracked = allRuns.filter((r) => runIds.has(r.run_id));
+            // Not yet in DB — keep waiting
+            if (tracked.length === 0) return { done: false };
+            const stillRunning = tracked.some(
+              (r) => r.status === "running"
+            );
             return { done: !stillRunning };
           },
           3000,
           300_000
         );
 
-        const reviews = await client.getReviews(pr_id);
-        return textResult(JSON.stringify(reviews, null, 2));
+        const allReviews = await client.getReviews(pr_id);
+        const thisRun = allReviews.filter(
+          (r) => r.run_id && runIds.has(r.run_id)
+        );
+        return textResult(JSON.stringify(thisRun, null, 2));
       } catch (err) {
         return errorResult(err);
       }

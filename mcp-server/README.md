@@ -72,7 +72,7 @@ Run a review agent on a pull request. Blocks until the review completes (up to 5
 | `pr_id` | string | Pull request ID (numeric string) |
 | `agent_id` | string | Agent ID from `list_agents` |
 
-**Returns:** Array of review objects with verdict, score, summary, and findings.
+**Returns:** Array of review objects from this run only (filtered by `run_id`), with verdict, score, summary, and findings.
 
 ---
 
@@ -109,14 +109,16 @@ Get the repository's inferred coding conventions.
 
 ### `get_blast_radius`
 
-Get a PR's influence map (changed symbols and their callers). **Placeholder** — returns
-a "not yet available" message until the server-side blast radius feature is implemented.
+Get a PR's influence map — changed symbols, their callers, and potentially affected endpoints.
 
 **Parameters:**
 
 | Name | Type | Description |
 |------|------|-------------|
 | `pr_id` | string | Pull request ID |
+
+**Returns:** Human-readable report listing changed symbols, grouped callers, and impacted endpoints.
+May include a degraded-mode note if PR files aren't loaded or the index is incomplete.
 
 ## Tests
 

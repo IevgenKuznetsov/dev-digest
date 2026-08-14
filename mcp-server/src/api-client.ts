@@ -39,12 +39,15 @@ export class DevDigestClient {
     return this.request<Agent[]>("GET", "/agents");
   }
 
-  runReview(prId: string, agentId: string): Promise<unknown> {
-    return this.request<unknown>("POST", `/pulls/${prId}/review`, { agentId });
+  runReview(
+    prId: string,
+    agentId: string
+  ): Promise<{ runs: { run_id: string; agent_id: string }[] }> {
+    return this.request("POST", `/pulls/${prId}/review`, { agentId });
   }
 
-  getActiveRuns(prId: string): Promise<RunSummary[]> {
-    return this.request<RunSummary[]>("GET", `/pulls/${prId}/runs/active`);
+  getAllRuns(prId: string): Promise<RunSummary[]> {
+    return this.request<RunSummary[]>("GET", `/pulls/${prId}/runs`);
   }
 
   getReviews(prId: string): Promise<ReviewRecord[]> {

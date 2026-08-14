@@ -59,14 +59,14 @@ describe("DevDigestClient", () => {
     });
   });
 
-  describe("getActiveRuns", () => {
-    it("calls GET /pulls/:id/runs/active", async () => {
+  describe("getAllRuns", () => {
+    it("calls GET /pulls/:id/runs", async () => {
       mockFetch.mockReturnValueOnce(mockOk([]));
 
-      await client.getActiveRuns("42");
+      await client.getAllRuns("42");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:3001/pulls/42/runs/active",
+        "http://localhost:3001/pulls/42/runs",
         expect.objectContaining({ method: "GET" })
       );
     });
