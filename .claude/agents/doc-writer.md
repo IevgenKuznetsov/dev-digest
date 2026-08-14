@@ -136,7 +136,7 @@ Invoke `mermaid-diagram` skill before creating diagrams. Choose the right type:
 
 - `CLAUDE.md` files — these have their own update process
 - `INSIGHTS.md` files — the `engineering-insight` skill handles these
-- `.spec.md` plan files — the planner agent handles these
+- `.spec.md` plan files — the implementation-planner agent handles these
 - Any file in `vendor/shared/` or `vendor/ui/`
 - Source code files (`.ts`, `.tsx`, `.js`)
 
