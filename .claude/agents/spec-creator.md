@@ -52,6 +52,7 @@ Read these files to ground your analysis in the actual project:
 4. **Shared contracts** — `Glob` for `server/src/vendor/shared/contracts/*.ts` to see existing Zod contracts.
 5. **DB schema index** — `Glob` for `server/src/db/schema/*.ts` to see existing tables.
 6. **Existing specs** — `Glob` for `<package>/specs/**/*.spec.md` to check for previous iterations of this feature.
+7. **Overlap scan** — `Glob` for `**/specs/**/*.spec.md` across ALL packages. For each spec found, read its **User stories** and **Goals** sections. Compare keywords and intent against the current feature prompt. If any existing spec covers similar capabilities, user workflows, or data models, record the spec file path and the overlapping areas. You will surface these in the first Q&A round.
 
 ### Step 3: First Q&A Round
 
@@ -61,6 +62,7 @@ Use `AskUserQuestion` to clarify scope and intent. Your questions should cover:
 - **User persona**: Who uses this feature? What's their workflow?
 - **Ambiguities**: Anything unclear or underspecified in the prompt.
 - **Existing patterns**: "I see module X already does something similar — should this extend it or be separate?"
+- **Overlap alert**: If the overlap scan (Step 2.7) found existing specs with similar user stories, goals, or data models, list each overlapping spec with the specific areas of overlap and ask the user: "Should this new spec extend/supersede the existing one, or are they intentionally separate?"
 - **Package split proposal**: If the feature spans server + client, propose whether to write one combined spec or separate specs, and explain your reasoning.
 
 ### Step 4: Second Q&A Round
@@ -106,6 +108,7 @@ Before each Q&A round, systematically check the feature description against thes
 | **UX states** | Loading, empty, error, success states? Keyboard shortcuts? |
 | **Concurrency** | Race conditions, duplicate submissions, optimistic updates, stale data? |
 | **Backwards compatibility** | Does this break existing APIs, contracts, or user workflows? |
+| **Spec overlap** | Does an existing spec already cover part of this capability? |
 | **Observability** | Logging, metrics, error reporting for this feature? |
 
 ## Spec Template
@@ -242,4 +245,5 @@ Before writing the final spec, verify:
 - [ ] Open questions section captures anything still unresolved — do not leave it empty just to look complete.
 - [ ] Spec ID follows `<FeatureName>_<N>` format.
 - [ ] Supersedes link is correct (or `—` for first iteration).
+- [ ] Overlap scan completed — any overlapping specs have been acknowledged in Q&A and the relationship is documented in Open Questions or Goals/Non-goals.
 - [ ] File path matches `<package>/specs/<feature-name>/<feature-name>.spec.md`.

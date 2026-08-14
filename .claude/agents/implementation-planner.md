@@ -102,9 +102,40 @@ Present recommendations via `AskUserQuestion` and incorporate feedback.
 ### Phase 5: Write the Plan
 
 1. Draft the full implementation plan.
-2. Present it to the user via `AskUserQuestion`: "Does this plan look correct? Any adjustments needed?"
-3. Incorporate any feedback.
-4. Only AFTER user approval, save the plan to `<package>/specs/<feature-name>/<feature-name>_plan.md` using the Write tool.
+2. Run the Plan-Completeness Gate (Phase 6) before presenting to the user.
+3. Present the plan AND the coverage matrix to the user via `AskUserQuestion`: "Does this plan look correct? Any adjustments needed?"
+4. Incorporate any feedback.
+5. Only AFTER user approval, save the plan to `<package>/specs/<feature-name>/<feature-name>_plan.md` using the Write tool.
+
+### Phase 6: Plan-Completeness Gate
+
+Before presenting the plan for user review, verify that every spec acceptance criterion
+is covered by at least one plan step. This gate is mandatory and cannot be skipped.
+
+1. **Extract criteria** — re-read the `.spec.md` file and list every EARS acceptance criterion (ubiquitous, state-driven, event-driven, optional-feature, unwanted-behavior). Number them AC-1, AC-2, etc.
+2. **Map to steps** — for each criterion, find which plan step(s) reference it in their "Addresses" field. Build a coverage matrix.
+3. **Flag gaps** — any criterion with zero matching steps is an UNCOVERED gap.
+4. **Resolve or document** — for each gap:
+   - If it's implementable: add a plan step to cover it, then re-run the mapping.
+   - If it's out-of-scope per the spec's non-goals: note the exclusion explicitly.
+   - If it's ambiguous: add it to the clarifying questions for the user.
+5. **Include coverage matrix in output** — append the matrix to the plan draft so the user can see exactly which steps satisfy which criteria.
+
+#### Coverage Matrix Format
+
+Include this section in the plan file, after the Requirements Summary:
+
+```markdown
+## Spec Coverage Matrix
+
+| Criterion | EARS Pattern | Plan Step(s) | Status |
+|-----------|-------------|--------------|--------|
+| AC-1: [criterion text] | Event-Driven | Step 2, Step 5 | COVERED |
+| AC-2: [criterion text] | Ubiquitous | Step 3 | COVERED |
+| AC-3: [criterion text] | Unwanted | — | GAP |
+```
+
+The plan MUST NOT be presented to the user while any GAP status remains unresolved.
 
 ## Codebase Exploration
 
@@ -186,6 +217,12 @@ Link to the spec file. Include any external research findings with citations.]
 [Brief summary of the spec's acceptance criteria that this plan addresses.
 Reference specific EARS criteria by their pattern type.]
 
+## Spec Coverage Matrix
+
+| Criterion | EARS Pattern | Plan Step(s) | Status |
+|-----------|-------------|--------------|--------|
+| AC-1: [criterion text] | [pattern] | Step N, Step M | COVERED |
+
 ## Recommendations Applied
 
 [List any improvements/optimizations you recommended that the user approved.
@@ -241,7 +278,7 @@ After user approval, save to `<package>/specs/<feature-name>/<feature-name>_plan
 
 Before delivering the plan, verify:
 
-- [ ] Spec file was read completely — all acceptance criteria are addressed.
+- [ ] Plan-Completeness Gate passed — coverage matrix shows all criteria COVERED, no GAPs remain.
 - [ ] At least one round of clarifying questions was asked.
 - [ ] Recommendations were presented to the user before finalizing.
 - [ ] Multi-agent permission was obtained (if applicable).
