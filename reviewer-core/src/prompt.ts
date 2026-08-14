@@ -1,4 +1,4 @@
-import type { ChatMessage, PromptAssembly, PromptAssemblyWithIntent } from '@devdigest/shared';
+import type { ChatMessage, PromptAssembly } from '@devdigest/shared';
 
 /**
  * Prompt assembly + prompt-injection hardening.
@@ -98,7 +98,7 @@ export interface PromptSectionMeta {
 
 export interface AssembledPrompt {
   messages: ChatMessage[];
-  assembly: PromptAssemblyWithIntent;
+  assembly: PromptAssembly;
   /** Per-section metadata — safe to log; contains no content. */
   sections: PromptSectionMeta[];
 }
@@ -155,7 +155,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     { role: 'user', content: user },
   ];
 
-  const assembly: PromptAssemblyWithIntent = {
+  const assembly: PromptAssembly = {
     system,
     skills: skillsBlock ?? null,
     memory: memoryBlock ?? null,

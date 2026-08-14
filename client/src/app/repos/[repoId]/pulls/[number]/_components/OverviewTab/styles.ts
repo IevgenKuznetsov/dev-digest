@@ -1,6 +1,12 @@
 import type { CSSProperties } from "react";
 
 export const s = {
+  cardsRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 12,
+    alignItems: "start",
+  } satisfies CSSProperties,
   descriptionBox: {
     border: "1px solid var(--border)",
     borderRadius: 8,

@@ -3,6 +3,7 @@
 import React from "react";
 import { SectionLabel } from "@devdigest/ui";
 import { IntentCard } from "./_components/IntentCard";
+import { BlastCard } from "./_components/BlastCard";
 import { s } from "./styles";
 
 interface OverviewTabProps {
@@ -14,7 +15,12 @@ interface OverviewTabProps {
 export function OverviewTab({ prBody, prId }: OverviewTabProps) {
   return (
     <>
-      {prId && <IntentCard prId={prId} />}
+      {prId && (
+        <div style={s.cardsRow}>
+          <IntentCard prId={prId} />
+          <BlastCard prId={prId} />
+        </div>
+      )}
 
       {prBody && (
         <section>

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "devdigest": {
+      "command": "node",
+      "args": ["./mcp-server/dist/index.js"],
+      "env": {
+        "DEVDIGEST_API_URL": "http://localhost:3001"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}"
+      }
+    }
+  }
+}

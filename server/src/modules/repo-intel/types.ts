@@ -29,7 +29,8 @@ export type DegradedReason =
   | 'index_failed'
   | 'index_partial'
   | 'repo_too_large'
-  | 'no_data';
+  | 'no_data'
+  | 'unranked_callers';
 
 export interface IndexResult {
   status: IndexStatus;

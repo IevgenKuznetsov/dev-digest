@@ -433,6 +433,43 @@ export class PullsService {
     return buildSmartDiff(files, findingsByFile);
   }
 
+  async getBlastForPr(workspaceId: string, prId: string) {
+    const { repo, pr } = await this.resolvePrAndRepo(prId, workspaceId);
+
+    const files = await this.container.db
+      .select({ path: t.prFiles.path })
+      .from(t.prFiles)
+      .where(eq(t.prFiles.prId, pr.id));
+
+    if (files.length === 0) {
+      return {
+        changed_symbols: [],
+        callers: [],
+        impacted_endpoints: [],
+        degraded: true,
+        reason: 'no_files',
+      };
+    }
+
+    const changedPaths = files.map((f) => f.path);
+    const result = await this.container.repoIntel.getBlastRadius(repo.id, changedPaths);
+
+    return {
+      changed_symbols: result.changedSymbols,
+      callers: result.callers.map((c) => ({
+        file: c.file,
+        symbol: c.symbol,
+        via_symbol: c.viaSymbol,
+        line: c.line,
+        rank: c.rank,
+      })),
+      impacted_endpoints: result.impactedEndpoints,
+      facts_by_file: result.factsByFile,
+      degraded: result.degraded,
+      reason: result.reason,
+    };
+  }
+
   private async resolvePrAndRepo(prId: string, workspaceId: string) {
     const [pr] = await this.container.db
       .select()
