@@ -1,9 +1,10 @@
 # Agent Map
 
-Nine specialized agents: a core **research → plan → implement** pipeline plus quality, orchestration, and support agents.
+Ten specialized agents: a core **spec → plan → implement** pipeline plus quality, orchestration, and support agents.
 
 | Agent | Model | Effort | Purpose |
 |-------|-------|--------|---------|
+| [spec-creator](#spec-creator) | opus | high | Analyze feature prompts, ask questions, produce `.spec.md` files with EARS criteria |
 | [researcher](#researcher) | sonnet | medium | Find and synthesize information from repo and web |
 | [planner](#planner) | opus | high | Design implementation plans → `docs/<Feature>_plan.md` |
 | [brainstorm](#brainstorm) | sonnet | medium | Spawn N planners in parallel, compare approaches with pros/cons |
@@ -13,6 +14,34 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 | [security-reviewer](#security-reviewer) | sonnet | medium | READ-ONLY security scan of branch diff with severity report |
 | [plan-verifier](#plan-verifier) | sonnet | medium | READ-ONLY point-by-point verification of plan vs implementation |
 | [doc-writer](#doc-writer) | sonnet | medium | Write documentation with Mermaid diagrams |
+
+---
+
+## spec-creator
+
+**Purpose:** Analyzes feature prompts, asks multi-round clarifying questions, discovers edge cases and missing design elements, and produces structured `.spec.md` files using EARS requirement patterns.
+
+**Responsibilities:**
+- Lightweight codebase scan (CLAUDE.md files, module index, contracts, DB schema)
+- Multi-round Q&A (minimum 2 rounds) to clarify scope, edge cases, and non-functional requirements
+- Auto-detecting which package(s) a feature affects
+- Auto-detecting spec iteration numbers by scanning existing specs
+- Producing specs with EARS acceptance criteria, edge case tables, and untrusted input analysis
+- Deciding whether to write one combined spec or separate specs per package
+
+**Permissions:** Read + Write (restricted to `<package>/specs/<feature-name>/<feature-name>.spec.md` only).
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Lightweight codebase scan (CLAUDE.md, module index, contracts, schemas, existing specs) |
+| Bash | Git log for recent changes |
+| Write | Save spec to `<package>/specs/<feature-name>/<feature-name>.spec.md` — the only allowed file |
+| AskUserQuestion | Multi-round Q&A (minimum 2 rounds before writing) |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Input:** Feature prompt describing what to build.
+
+**Output:** Structured `.spec.md` file with: Problem & User, Goals/Non-goals, User Stories, EARS Acceptance Criteria, Edge Cases, Non-functional Requirements, Inputs & Provenance, Untrusted Inputs, Open Questions.
 
 ---
 
@@ -285,9 +314,9 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 ## Pipeline Flow
 
 ```
-Optimized pipeline:   planner (self-explores) ──plan──> implementor ──report──> user
-                                                  │                    │
-                                                  └── delegates ───────┘ stops if plan is wrong
+Full pipeline:        spec-creator ──spec──> planner ──plan──> implementor ──report──> user
+                           │                    │                    │
+                           └── Q&A ──> user     └── delegates ───────┘ stops if plan is wrong
 
 Optional research:    planner ──delegates──> researcher (only for genuinely unknown domains)
 
@@ -301,11 +330,13 @@ Support:              test-writer ──test files──> test results
                       doc-writer ──docs──> user
 ```
 
+The spec-creator analyzes feature prompts via multi-round Q&A and produces `.spec.md` files.
 The planner explores the codebase directly (no separate Explore agent needed) and presents
 plans as text for user review. Researcher is only spawned for genuinely unknown domains.
 The implementor executes approved plans. Quality gates (architecture-reviewer, security-reviewer,
 plan-verifier) run on sonnet with compact output (under 2000 words each) to minimize token
 usage. Support agents (test-writer, doc-writer) produce artifacts independently.
 
-**Token optimization:** Only planner and implementor use opus-class models. All reviewers,
-researcher, and brainstorm use sonnet with medium effort. Output caps prevent verbose reports.
+**Token optimization:** Only spec-creator, planner, and implementor use opus-class models.
+All reviewers, researcher, and brainstorm use sonnet with medium effort. Output caps prevent
+verbose reports.
