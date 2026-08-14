@@ -10,7 +10,7 @@ Ten specialized agents: a core **spec → plan → implement** pipeline plus qua
 | [brainstorm](#brainstorm) | sonnet | medium | Spawn N implementation-planners in parallel, compare approaches with pros/cons |
 | [implementor](#implementor) | sonnet | medium | Execute plans step by step |
 | [test-writer](#test-writer) | sonnet | medium | Write unit and integration tests |
-| [architecture-reviewer](#architecture-reviewer) | sonnet | medium | READ-ONLY check of architecture boundaries per module |
+| [architecture-reviewer](#architecture-reviewer) | sonnet | medium | READ-ONLY check of architecture boundaries for branch-affected modules only |
 | [security-reviewer](#security-reviewer) | sonnet | medium | READ-ONLY security scan of branch diff with severity report |
 | [plan-verifier](#plan-verifier) | sonnet | medium | READ-ONLY point-by-point verification of plan vs implementation |
 | [doc-writer](#doc-writer) | sonnet | medium | Write documentation with Mermaid diagrams |
@@ -200,29 +200,38 @@ Ten specialized agents: a core **spec → plan → implement** pipeline plus qua
 
 ## architecture-reviewer
 
-**Purpose:** Read-only agent that checks architecture boundaries for a specific module on demand.
+**Purpose:** Read-only agent that checks architecture boundaries for modules affected by the current branch's changes. Auto-detects affected scope from `git diff main...HEAD`.
 
 **Responsibilities:**
+- Auto-detecting affected packages and modules from branch diff
+- Early exit when no architecture-relevant files changed
 - Checking onion architecture layer violations (domain → application → infrastructure)
 - Validating module isolation (no cross-module internal imports)
 - Verifying CLAUDE.md "Do not touch" rules (vendor/shared, INJECTION_GUARD, grounding gate)
 - Checking secrets handling (SecretsProvider only)
 - Providing evidence for every finding (file:line + code snippet)
 
+**Token optimization:**
+- Scopes review to changed files and their direct imports only
+- Loads skills selectively per affected package (not all skills every time)
+- Skips entire rule categories when the affected packages don't match
+- Uses `git diff` content instead of reading full files for protected-file checks
+- Reports only checked rules in "Clean Rules" section
+
 **Permissions:** Read-only. Cannot modify files.
 
 | Tools | Why |
 |-------|-----|
-| Read, Grep, Glob | Search for violations and read code |
-| Bash | Git diff/log/blame for change analysis |
-| Skill | Load onion-architecture and other review skills |
+| Read, Grep, Glob | Search for violations in changed files and imports |
+| Bash | Git diff to detect affected scope and check protected files |
+| Skill | Load only skills relevant to affected packages |
 | TaskCreate, TaskUpdate | Track progress |
 
-**Preloaded skills:** onion-architecture, react-frontend-best-practices, typescript-expert, security, fastify-best-practices, zod
+**Preloaded skills (loaded selectively):** onion-architecture, react-frontend-best-practices, typescript-expert, security, fastify-best-practices, zod
 
-**Input:** A specific module to review (e.g., "reviews module", "server/src/modules/agents").
+**Input:** Runs on the current branch — no explicit input needed (uses `git diff main...HEAD`).
 
-**Output:** Structured report with severity-classified findings, each with file:line evidence and rule source citation.
+**Output:** Structured report scoped to affected modules, with severity-classified findings, file:line evidence, and list of skipped/checked rule categories.
 
 ---
 
