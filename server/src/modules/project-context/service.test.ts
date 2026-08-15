@@ -72,6 +72,11 @@ function buildService() {
 
   const service = new ProjectContextService(container);
 
+  // Default repo row returned by getRepoById / getRepoForWorkspace.
+  // Cast needed because tests only use id and clonePath.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let repoRow: any = { id: 'repo-1', clonePath: '/clones/repo-1' };
+
   // Replace the private repo with a vitest-mocked stub.
   const repo: Partial<ProjectContextRepository> = {
     getAgentDocsForMerge: vi.fn(),
@@ -83,6 +88,8 @@ function buildService() {
     getById: vi.fn(),
     getAgentDocs: vi.fn(),
     countByRepo: vi.fn(),
+    getRepoById: vi.fn(async () => repoRow),
+    getRepoForWorkspace: vi.fn(async () => repoRow),
   };
 
   // Inject via the private field name.
@@ -90,6 +97,7 @@ function buildService() {
 
   const setClonePath = (clonePath: string | null) => {
     dbRows = [{ id: 'repo-1', clonePath }];
+    repoRow = { id: 'repo-1', clonePath };
   };
 
   return { service, repo, setClonePath };
@@ -202,6 +210,23 @@ describe('resolveContextForAgent — merge algorithm', () => {
 
     expect(result).toHaveLength(0);
     expect(warnings.some((w) => w.includes('clone directory'))).toBe(true);
+  });
+});
+
+// ====================================================== Path traversal guard
+
+describe('readContent — path traversal rejection', () => {
+  it('throws a 400 AppError when the doc path contains ../ sequences', async () => {
+    const { service, repo } = buildService();
+
+    // Inject a doc whose path would traverse outside the clone root.
+    const maliciousDoc = makeDoc({ path: '../../etc/passwd', workspaceId: 'ws-1' });
+    vi.mocked(repo.getById!).mockResolvedValue(maliciousDoc);
+
+    await expect(service.readContent('ws-1', 'doc-1')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'path_traversal',
+    });
   });
 });
 

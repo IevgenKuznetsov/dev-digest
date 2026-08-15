@@ -5,9 +5,10 @@
  * Uses a real temporary filesystem directory to simulate the repo clone.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, rm, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { eq } from 'drizzle-orm';
 import { startPg, dockerAvailable, type PgFixture } from '../../../test/helpers/pg.js';
 import { buildApp } from '../../app.js';
 import { loadConfig } from '../../platform/config.js';
@@ -268,6 +269,172 @@ d('project-context routes (integration)', () => {
     });
     const body = getRes.json() as { attached: unknown[] };
     expect(body.attached).toHaveLength(0);
+
+    await app.close();
+  });
+
+  // ====================================================== Attach to skill
+
+  // ====================================================== Reorder (FIX-P5)
+
+  it('PUT /agents/:agentId/context with reordered docs persists the new order', async () => {
+    const app = await buildTestApp();
+
+    // Ensure we have at least 2 docs.
+    await app.inject({ method: 'POST', url: `/repos/${repoId}/context/scan` });
+    await app.container.jobs.onIdle();
+
+    const listRes = await app.inject({ method: 'GET', url: `/repos/${repoId}/context/docs` });
+    const docs = listRes.json() as Array<{ id: string; path: string }>;
+    if (docs.length < 2) {
+      await app.close();
+      return; // Not enough docs to test reorder.
+    }
+
+    const first = docs[0] as { id: string };
+    const second = docs[1] as { id: string };
+
+    // Attach in original order (0, 1).
+    await app.inject({
+      method: 'PUT',
+      url: `/agents/${agentId}/context`,
+      payload: {
+        docs: [
+          { contextDocId: first.id, order: 0 },
+          { contextDocId: second.id, order: 1 },
+        ],
+      },
+    });
+
+    // Reorder: flip order values.
+    const reorderRes = await app.inject({
+      method: 'PUT',
+      url: `/agents/${agentId}/context`,
+      payload: {
+        docs: [
+          { contextDocId: second.id, order: 0 },
+          { contextDocId: first.id, order: 1 },
+        ],
+      },
+    });
+    expect(reorderRes.statusCode).toBe(204);
+
+    // Fetch and verify the new order is persisted.
+    const getRes = await app.inject({ method: 'GET', url: `/agents/${agentId}/context` });
+    expect(getRes.statusCode).toBe(200);
+    const body = getRes.json() as { attached: Array<{ id: string; order: number }> };
+    const firstAttached = body.attached.find((d) => d.id === second.id);
+    const secondAttached = body.attached.find((d) => d.id === first.id);
+    expect(firstAttached?.order).toBe(0);
+    expect(secondAttached?.order).toBe(1);
+
+    await app.close();
+  });
+
+  // ====================================================== Path traversal via real request (FIX-P6)
+
+  it('injecting a doc with ../ path and reading content returns 400', async () => {
+    const app = await buildTestApp();
+
+    // Insert a doc row with a traversal path directly into the DB.
+    const [maliciousDoc] = await pg.handle.db
+      .insert(t.contextDocs)
+      .values({
+        workspaceId,
+        repoId,
+        path: '../../etc/passwd',
+        category: 'other',
+        tokens: 0,
+        scannedAt: new Date(),
+      })
+      .returning();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/repos/${repoId}/context/docs/${maliciousDoc!.id}/content`,
+    });
+    expect(res.statusCode).toBe(400);
+
+    // Clean up the malicious row.
+    await pg.handle.db
+      .delete(t.contextDocs)
+      .where(eq(t.contextDocs.id, maliciousDoc!.id));
+
+    await app.close();
+  });
+
+  // ====================================================== Missing file on disk (FIX-P7)
+
+  it('GET /repos/:repoId/context/docs/:docId/content returns error when file is missing', async () => {
+    const app = await buildTestApp();
+
+    // Ensure we have docs.
+    await app.inject({ method: 'POST', url: `/repos/${repoId}/context/scan` });
+    await app.container.jobs.onIdle();
+
+    const listRes = await app.inject({ method: 'GET', url: `/repos/${repoId}/context/docs` });
+    const docs = listRes.json() as Array<{ id: string; path: string }>;
+    const target = docs.find((d) => d.path === 'docs/architecture.md');
+    if (!target) {
+      await app.close();
+      return;
+    }
+
+    // Delete the file from disk so it no longer exists.
+    await unlink(join(cloneDir, 'docs', 'architecture.md'));
+
+    const contentRes = await app.inject({
+      method: 'GET',
+      url: `/repos/${repoId}/context/docs/${target.id}/content`,
+    });
+    // Should get a 404 (file_not_found) — not a crash.
+    expect(contentRes.statusCode).toBe(404);
+
+    // Restore the file so it doesn't break other tests.
+    await writeFile(join(cloneDir, 'docs', 'architecture.md'), '# Architecture\nService mesh pattern.');
+
+    await app.close();
+  });
+
+  // ====================================================== Multipart upload (FIX-P4)
+
+  it('POST /repos/:repoId/context/docs/upload accepts a .md file via multipart', async () => {
+    const app = await buildTestApp();
+
+    // Build a multipart body manually (boundary: ----TestBoundary).
+    const boundary = '----TestBoundary';
+    const fileContent = '# Uploaded spec\nThis was uploaded via multipart.';
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="directory"',
+      '',
+      'specs',
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="upload-test.md"',
+      'Content-Type: text/markdown',
+      '',
+      fileContent,
+      `--${boundary}--`,
+      '',
+    ].join('\r\n');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/repos/${repoId}/context/docs/upload`,
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(201);
+    const doc = res.json() as { path: string };
+    expect(doc.path).toBe('specs/upload-test.md');
+
+    // Cleanup the uploaded file from disk.
+    try {
+      await unlink(join(cloneDir, 'specs', 'upload-test.md'));
+    } catch {
+      // Already gone — no-op.
+    }
 
     await app.close();
   });

@@ -20,6 +20,7 @@ import { CreateDocModal } from "../CreateDocModal";
 import { UploadDocModal } from "../UploadDocModal";
 import { CreateFolderModal } from "../CreateFolderModal";
 import { s } from "./styles";
+import { formatRelativeTime } from "./helpers";
 
 interface ProjectContextViewProps {
   repoId: string;
@@ -38,7 +39,9 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
   const { data: docContent } = useContextDocContent(repoId, selectedDocId);
 
   const scan = useScanContextDocs(repoId);
-  const updateContent = useUpdateContextDocContent(repoId, selectedDocId);
+  const updateContent = useUpdateContextDocContent(repoId, selectedDocId, {
+    onSuccess: () => setMode("preview"),
+  });
   const createDoc = useCreateContextDoc(repoId);
   const deleteDoc = useDeleteContextDoc(repoId);
   const uploadDoc = useUploadContextDoc(repoId);
@@ -69,11 +72,7 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
   }, [docs, selectedDocId]);
 
   const handleSave = () => {
-    updateContent.mutate(editorContent, {
-      onSuccess: () => {
-        setMode("preview");
-      },
-    });
+    updateContent.mutate(editorContent);
   };
 
   const handleCreateDoc = (directory: "specs" | "docs" | "insights", filename: string) => {
@@ -103,16 +102,6 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
       { directory, name },
       { onSuccess: () => setShowCreateFolder(false) },
     );
-  };
-
-  const formatRelativeTime = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60_000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
   };
 
   const lastScanned = docs && docs.length > 0

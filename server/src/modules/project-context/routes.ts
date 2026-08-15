@@ -4,7 +4,6 @@ import multipart from '@fastify/multipart';
 
 import { getContext } from '../_shared/context.js';
 import { AppError } from '../../platform/errors.js';
-import { ProjectContextService } from './service.js';
 import {
   RepoIdParams,
   DocIdParams,
@@ -16,6 +15,12 @@ import {
   SetContextBody,
   ListDocsQuery,
 } from './helpers.js';
+
+interface MultipartFile {
+  filename?: string;
+  fields?: Record<string, { value: string }>;
+  toBuffer: () => Promise<Buffer>;
+}
 
 /**
  * project-context module.
@@ -37,7 +42,7 @@ import {
  */
 export default async function projectContextRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
-  const service = new ProjectContextService(app.container);
+  const service = app.container.projectContext;
 
   // Register multipart support locally (does not affect other modules).
   await app.register(multipart, { limits: { fileSize: 500 * 1024 } });
@@ -176,11 +181,6 @@ export default async function projectContextRoutes(appBase: FastifyInstance) {
     async (req, reply) => {
       const { workspaceId } = await getContext(app.container, req);
 
-      interface MultipartFile {
-        filename?: string;
-        fields?: Record<string, { value: string }>;
-        toBuffer: () => Promise<Buffer>;
-      }
       const data = await (req as { file: () => Promise<MultipartFile | null> }).file();
       if (!data) throw new AppError('upload_error', 'No file provided', 400);
 

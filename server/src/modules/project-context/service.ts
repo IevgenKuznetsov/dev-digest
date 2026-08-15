@@ -1,6 +1,5 @@
 import { readFile, writeFile, mkdir, access, unlink } from 'node:fs/promises';
-import { resolve, dirname, join } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { resolve, dirname, sep } from 'node:path';
 import type { Container } from '../../platform/container.js';
 import { AppError, NotFoundError, ValidationError } from '../../platform/errors.js';
 import type { ContextDocCategory, SpecReadEntry } from '@devdigest/shared';
@@ -9,7 +8,6 @@ import type { ContextDocRow } from './repository.js';
 import { scanDirectory, countTokens, validateFilename, validateContent } from './scanner.js';
 import { DEFAULT_GLOBS } from './helpers.js';
 import type { AgentContextDocEntry } from './repository.js';
-import * as schema from '../../db/schema.js';
 
 export interface ContextDocResult {
   id: string;
@@ -50,7 +48,7 @@ export class ProjectContextService {
    * Returns the full list of docs for this repo after scan.
    */
   async scan(workspaceId: string, repoId: string): Promise<ContextDocRow[]> {
-    const repoRow = await this.getRepoRow(repoId);
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
     if (!repoRow.clonePath) {
       throw new AppError('scan_error', 'Repository clone directory not available', 400);
     }
@@ -85,7 +83,8 @@ export class ProjectContextService {
   // ---- Doc listing / retrieval ---------------------------------------------
 
   async listDocs(workspaceId: string, repoId: string, search?: string): Promise<ContextDocRow[]> {
-    void workspaceId; // workspace scoping via repoId FK
+    // Verify the repo belongs to this workspace before returning its docs (FIX-S4).
+    await this.getRepoRow(workspaceId, repoId);
     return this.repo.listByRepo(repoId, search);
   }
 
@@ -100,7 +99,7 @@ export class ProjectContextService {
 
   async readContent(workspaceId: string, docId: string): Promise<string> {
     const doc = await this.getDoc(workspaceId, docId);
-    const repoRow = await this.getRepoRow(doc.repoId);
+    const repoRow = await this.getRepoRowById(doc.repoId);
     if (!repoRow.clonePath) {
       throw new AppError('file_error', 'Repository clone directory not available', 400);
     }
@@ -126,7 +125,7 @@ export class ProjectContextService {
     if (!validation.ok) throw new ValidationError(validation.reason);
 
     const doc = await this.getDoc(workspaceId, docId);
-    const repoRow = await this.getRepoRow(doc.repoId);
+    const repoRow = await this.getRepoRowById(doc.repoId);
     if (!repoRow.clonePath) {
       throw new AppError('file_error', 'Repository clone directory not available', 400);
     }
@@ -159,7 +158,7 @@ export class ProjectContextService {
     const contentValidation = validateContent(content);
     if (!contentValidation.ok) throw new ValidationError(contentValidation.reason);
 
-    const repoRow = await this.getRepoRow(repoId);
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
     if (!repoRow.clonePath) {
       throw new AppError('file_error', 'Repository clone directory not available', 400);
     }
@@ -198,7 +197,7 @@ export class ProjectContextService {
 
   async deleteDoc(workspaceId: string, docId: string): Promise<void> {
     const doc = await this.getDoc(workspaceId, docId);
-    const repoRow = await this.getRepoRow(doc.repoId);
+    const repoRow = await this.getRepoRowById(doc.repoId);
 
     if (repoRow.clonePath) {
       const filePath = this.resolveAndValidatePath(repoRow.clonePath, doc.path);
@@ -222,8 +221,7 @@ export class ProjectContextService {
     directory: 'specs' | 'docs' | 'insights',
     name: string,
   ): Promise<{ path: string }> {
-    void workspaceId;
-    const repoRow = await this.getRepoRow(repoId);
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
     if (!repoRow.clonePath) {
       throw new AppError('file_error', 'Repository clone directory not available', 400);
     }
@@ -246,7 +244,9 @@ export class ProjectContextService {
     attached: Array<ContextDocResult & { order: number }>;
     totalAvailable: number;
   }> {
-    void workspaceId;
+    // Verify the agent belongs to this workspace (IDOR guard — FIX-S2).
+    const agent = await this.repo.getAgentForWorkspace(workspaceId, agentId);
+    if (!agent) throw new NotFoundError('Agent not found');
     const rows = await this.repo.getAgentDocs(agentId);
     // We need repoId to count available — get from first doc or agent row.
     // totalAvailable uses a separate count (all docs for any repo this agent touches).
@@ -270,11 +270,16 @@ export class ProjectContextService {
 
   async getSkillContext(workspaceId: string, skillId: string): Promise<{
     attached: Array<ContextDocResult & { order: number }>;
+    totalAvailable: number;
   }> {
-    void workspaceId;
+    // Verify the skill belongs to this workspace (IDOR guard — FIX-S2).
+    const skill = await this.repo.getSkillForWorkspace(workspaceId, skillId);
+    if (!skill) throw new NotFoundError('Skill not found');
     const rows = await this.repo.getSkillDocs(skillId);
+    const totalAvailable = 0; // Skill context doesn't count repo-wide available docs.
     return {
       attached: rows.map((r) => ({ ...this.toResult(r.doc), order: r.order })),
+      totalAvailable,
     };
   }
 
@@ -326,8 +331,8 @@ export class ProjectContextService {
 
     if (deduped.length === 0) return [];
 
-    // Step 4: get the clone path for this repo
-    const repoRow = await this.getRepoRow(repoId);
+    // Step 4: get the clone path for this repo (no workspace check — repoId comes from agent's docs)
+    const repoRow = await this.getRepoRowById(repoId);
     if (!repoRow.clonePath) {
       onWarning?.('context merge: repository clone directory not available, skipping all context docs');
       return [];
@@ -336,7 +341,13 @@ export class ProjectContextService {
     // Step 5: read content from disk for each doc
     const results: Array<SpecReadEntry & { content: string }> = [];
     for (const doc of deduped) {
-      const filePath = join(repoRow.clonePath, doc.path);
+      let filePath: string;
+      try {
+        filePath = this.resolveAndValidatePath(repoRow.clonePath, doc.path);
+      } catch {
+        onWarning?.(`context doc path traversal rejected: ${doc.path}, skipping`);
+        continue;
+      }
       try {
         const content = await readFile(filePath, 'utf8');
         results.push({
@@ -368,11 +379,23 @@ export class ProjectContextService {
 
   // ---- Private helpers -----------------------------------------------------
 
-  private async getRepoRow(repoId: string) {
-    const [repo] = await this.container.db
-      .select()
-      .from(schema.repos)
-      .where(eq(schema.repos.id, repoId));
+  /**
+   * Fetch a repo row by id, verifying workspace ownership.
+   * Throws NotFoundError when the repo is missing or belongs to another workspace.
+   */
+  private async getRepoRow(workspaceId: string, repoId: string) {
+    const repo = await this.repo.getRepoForWorkspace(workspaceId, repoId);
+    if (!repo) throw new NotFoundError('Repository not found');
+    return repo;
+  }
+
+  /**
+   * Fetch a repo row by id without workspace check.
+   * Only use when repoId was derived from an already workspace-validated row
+   * (e.g. a contextDoc that already passed getDoc() ownership check).
+   */
+  private async getRepoRowById(repoId: string) {
+    const repo = await this.repo.getRepoById(repoId);
     if (!repo) throw new NotFoundError('Repository not found');
     return repo;
   }
@@ -384,7 +407,7 @@ export class ProjectContextService {
   private resolveAndValidatePath(clonePath: string, relativePath: string): string {
     const resolved = resolve(clonePath, relativePath);
     const normalClone = resolve(clonePath);
-    if (!resolved.startsWith(normalClone + '/') && resolved !== normalClone) {
+    if (!resolved.startsWith(normalClone + sep) && resolved !== normalClone) {
       throw new AppError(
         'path_traversal',
         'Path traversal detected — access to files outside the repository is not allowed',

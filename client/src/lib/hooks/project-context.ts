@@ -2,7 +2,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, apiUpload } from "../api";
+import { api, apiText, apiUpload } from "../api";
 
 // ---------------------------------------------------------------------------
 // Types (inline — matching the server API shapes)
@@ -61,9 +61,7 @@ export function useContextDoc(repoId: string | null | undefined, docId: string |
 export function useContextDocContent(repoId: string | null | undefined, docId: string | null | undefined) {
   return useQuery({
     queryKey: ["context-doc-content", repoId, docId],
-    queryFn: () =>
-      fetch(`${process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3001"}/repos/${repoId}/context/docs/${docId}/content`)
-        .then((r) => r.text()),
+    queryFn: () => apiText(`/repos/${repoId}/context/docs/${docId}/content`),
     enabled: !!repoId && !!docId,
   });
 }
@@ -78,7 +76,11 @@ export function useScanContextDocs(repoId: string | null | undefined) {
   });
 }
 
-export function useUpdateContextDocContent(repoId: string | null | undefined, docId: string | null | undefined) {
+export function useUpdateContextDocContent(
+  repoId: string | null | undefined,
+  docId: string | null | undefined,
+  options?: { onSuccess?: () => void },
+) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (content: string) =>
@@ -87,6 +89,7 @@ export function useUpdateContextDocContent(repoId: string | null | undefined, do
       qc.invalidateQueries({ queryKey: ["context-doc", repoId, docId] });
       qc.invalidateQueries({ queryKey: ["context-doc-content", repoId, docId] });
       qc.invalidateQueries({ queryKey: ["context-docs", repoId] });
+      options?.onSuccess?.();
     },
   });
 }
@@ -161,10 +164,15 @@ export function useSetAgentContext(agentId: string | null | undefined) {
 // Skill context attachments
 // ---------------------------------------------------------------------------
 
+export interface SkillContextResponse {
+  attached: SkillContextDoc[];
+  totalAvailable: number;
+}
+
 export function useSkillContext(skillId: string | null | undefined) {
   return useQuery({
     queryKey: ["skill-context", skillId],
-    queryFn: () => api.get<SkillContextDoc[]>(`/skills/${skillId}/context`),
+    queryFn: () => api.get<SkillContextResponse>(`/skills/${skillId}/context`),
     enabled: !!skillId,
   });
 }

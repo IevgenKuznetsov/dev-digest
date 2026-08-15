@@ -9,7 +9,7 @@ import {
   useSetSkillContext,
   useContextDocs,
 } from "@/lib/hooks/project-context";
-import type { SkillContextDoc, ContextDoc } from "@/lib/hooks/project-context";
+import type { SkillContextDoc, ContextDoc, SkillContextResponse } from "@/lib/hooks/project-context";
 import { useActiveRepo } from "@/lib/repo-context";
 
 const MAX_ATTACHED = 10;
@@ -22,20 +22,21 @@ export function SkillContextSection({ skillId }: SkillContextSectionProps) {
   const { activeRepo } = useActiveRepo();
   const repoId = activeRepo?.id;
 
-  const { data: attached = [], isLoading: loadingSkill, isError } = useSkillContext(skillId);
+  const { data: skillContextData, isLoading: loadingSkill, isError } = useSkillContext(skillId);
+  const attached: SkillContextDoc[] = skillContextData?.attached ?? [];
   const { data: allDocs, isLoading: loadingDocs } = useContextDocs(repoId);
   const setContext = useSetSkillContext(skillId);
 
   const [showAll, setShowAll] = React.useState(false);
 
   const attachedIds = React.useMemo(
-    () => new Set((attached as SkillContextDoc[]).map((d) => d.id)),
+    () => new Set(attached.map((d) => d.id)),
     [attached],
   );
 
   const displayList: ContextDoc[] = React.useMemo(() => {
     if (showAll) return allDocs ?? [];
-    return (attached as SkillContextDoc[]);
+    return attached;
   }, [showAll, allDocs, attached]);
 
   const applyOrder = (ids: string[]) => {
@@ -43,7 +44,7 @@ export function SkillContextSection({ skillId }: SkillContextSectionProps) {
   };
 
   const toggleAttach = (docId: string) => {
-    const sortedAttached = [...(attached as SkillContextDoc[])].sort((a, b) => a.order - b.order);
+    const sortedAttached = [...attached].sort((a, b) => a.order - b.order);
     if (attachedIds.has(docId)) {
       applyOrder(sortedAttached.filter((d) => d.id !== docId).map((d) => d.id));
     } else {
@@ -89,7 +90,7 @@ export function SkillContextSection({ skillId }: SkillContextSectionProps) {
             color: "var(--accent)",
           }}
         >
-          {(attached as SkillContextDoc[]).length} of {totalAvailable} attached
+          {attached.length} of {totalAvailable} attached
         </span>
       </div>
 
@@ -138,7 +139,7 @@ export function SkillContextSection({ skillId }: SkillContextSectionProps) {
                 checked={isAttached}
                 onChange={() => toggleAttach(doc.id)}
                 style={{ cursor: "pointer", accentColor: "var(--accent)" }}
-                disabled={!isAttached && (attached as SkillContextDoc[]).length >= MAX_ATTACHED}
+                disabled={!isAttached && attached.length >= MAX_ATTACHED}
                 aria-label={isAttached ? `Detach ${doc.path}` : `Attach ${doc.path}`}
               />
               <span

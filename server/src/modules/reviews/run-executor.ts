@@ -9,7 +9,6 @@ import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import { classifyIntent } from './intent-service.js';
-import { ProjectContextService } from '../project-context/service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -213,8 +212,7 @@ export class ReviewRunExecutor {
       // ---- Project context: resolve attached context docs -------------------
       // Resolved BEFORE reviewPullRequest() so the array is available in both
       // the success path (trace line ~320) and the failure path (traceFromBuffer).
-      const contextService = new ProjectContextService(this.container);
-      const resolvedContextDocs = await contextService.resolveContextForAgent(
+      const resolvedContextDocs = await this.container.projectContext.resolveContextForAgent(
         agent.id,
         pull.repoId,
         (msg) => runLog.info(msg),

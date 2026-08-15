@@ -245,6 +245,67 @@ export class ProjectContextRepository {
     });
   }
 
+  // ---- Repo ownership queries ----------------------------------------------
+
+  /**
+   * Fetch a repo row only when it belongs to the given workspace.
+   * Returns null when the repo doesn't exist or belongs to a different workspace.
+   * Use this to perform workspace membership checks before returning data.
+   */
+  async getRepoForWorkspace(
+    workspaceId: string,
+    repoId: string,
+  ): Promise<typeof t.repos.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(t.repos)
+      .where(and(eq(t.repos.id, repoId), eq(t.repos.workspaceId, workspaceId)));
+    return row ?? null;
+  }
+
+  /**
+   * Fetch a repo row by id (no workspace check). Used internally by the service
+   * when the repoId is already known to be valid (e.g. derived from a doc row
+   * that was already workspace-validated).
+   */
+  async getRepoById(repoId: string): Promise<typeof t.repos.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(t.repos)
+      .where(eq(t.repos.id, repoId));
+    return row ?? null;
+  }
+
+  /**
+   * Fetch an agent row and verify it belongs to the given workspace.
+   * Returns null when the agent doesn't exist or belongs to a different workspace.
+   */
+  async getAgentForWorkspace(
+    workspaceId: string,
+    agentId: string,
+  ): Promise<typeof t.agents.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.id, agentId), eq(t.agents.workspaceId, workspaceId)));
+    return row ?? null;
+  }
+
+  /**
+   * Fetch a skill row and verify it belongs to the given workspace.
+   * Returns null when the skill doesn't exist or belongs to a different workspace.
+   */
+  async getSkillForWorkspace(
+    workspaceId: string,
+    skillId: string,
+  ): Promise<typeof t.skills.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.id, skillId), eq(t.skills.workspaceId, workspaceId)));
+    return row ?? null;
+  }
+
   // ---- Scan guard ----------------------------------------------------------
 
   /**

@@ -13,6 +13,8 @@ import {
   REFRESH_JOB_KIND,
 } from '../repo-intel/constants.js';
 
+const CONTEXT_SCAN_JOB_KIND = 'context-scan';
+
 /**
  * F1 — repos service. Business logic for the Repositories feature:
  *   - add / list / refresh / remove
@@ -74,6 +76,17 @@ export class RepoService {
         // No handler registered or transient enqueue failure — clone has
         // already succeeded, so we don't fail the job for an index-followup
         // miss. The user can hit POST /repos/:id/reindex to retry.
+      }
+
+      // AC-E1 — auto-scan for context docs after every clone/sync.
+      try {
+        await this.container.jobs.enqueue(workspaceId, CONTEXT_SCAN_JOB_KIND, {
+          workspaceId,
+          repoId,
+        });
+      } catch {
+        // Handler not yet registered (e.g. project-context module disabled) or
+        // a scan is already running — either way the clone is already done.
       }
     }
   }

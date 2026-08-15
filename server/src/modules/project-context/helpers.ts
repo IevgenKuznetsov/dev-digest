@@ -39,13 +39,13 @@ export const CreateDocBody = z.object({
 export type CreateDocBody = z.infer<typeof CreateDocBody>;
 
 export const UpdateContentBody = z.object({
-  content: z.string(),
+  content: z.string().max(MAX_FILE_SIZE),
 });
 export type UpdateContentBody = z.infer<typeof UpdateContentBody>;
 
 export const CreateFolderBody = z.object({
   directory: z.enum(['specs', 'docs', 'insights']),
-  name: z.string().min(1),
+  name: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/, 'Folder name may only contain letters, numbers, hyphens, and underscores'),
 });
 export type CreateFolderBody = z.infer<typeof CreateFolderBody>;
 
