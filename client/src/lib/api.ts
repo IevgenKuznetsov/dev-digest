@@ -62,6 +62,46 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return (await res.json()) as T;
 }
 
+/** Upload helper for multipart/form-data requests.
+ * Do NOT set content-type manually — the browser auto-sets it with the
+ * correct multipart/form-data boundary when FormData is used. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (e) {
+    throw new ApiError(
+      `Cannot reach the DevDigest engine at ${API_BASE}. Is the API running?`,
+      0,
+      "network_error",
+      e
+    );
+  }
+
+  if (!res.ok) {
+    let code: string | undefined;
+    let message = `${res.status} ${res.statusText}`;
+    let details: unknown;
+    try {
+      const body = await res.json();
+      if (body?.error) {
+        code = body.error.code;
+        message = body.error.message ?? message;
+        details = body.error.details;
+      }
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(message, res.status, code, details);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
   post: <T>(path: string, body?: unknown) =>

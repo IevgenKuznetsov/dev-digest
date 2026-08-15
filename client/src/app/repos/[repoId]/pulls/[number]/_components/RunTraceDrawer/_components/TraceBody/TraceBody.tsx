@@ -40,11 +40,21 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
               {trace.specs_read.length === 0 ? (
                 <span style={s.specsNone}>{t("trace.config.none")}</span>
               ) : (
-                trace.specs_read.map((sp) => (
-                  <span key={sp} className="mono" style={s.spec}>
-                    {sp}
-                  </span>
-                ))
+                trace.specs_read.map((sp) => {
+                  const entry =
+                    typeof sp === "string"
+                      ? { path: sp, category: "other" as const, tokens: 0 }
+                      : sp;
+                  return (
+                    <div key={entry.path} style={s.specEntry}>
+                      <span className="mono" style={s.specPath}>{entry.path}</span>
+                      <Badge color="var(--text-muted)" style={s.specCategory}>{entry.category}</Badge>
+                      {entry.tokens > 0 && (
+                        <span style={s.specTokens}>{entry.tokens} tok</span>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </Row>

@@ -1,5 +1,5 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, RunStatsCost, UnifiedDiff, EnrichedIntent } from '@devdigest/shared';
+import type { Provider, Review, RunTrace, RunStatsCost, UnifiedDiff, EnrichedIntent, SpecReadEntry } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers, filterByScope, type PromptSectionMeta } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
@@ -9,6 +9,7 @@ import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import { classifyIntent } from './intent-service.js';
+import { ProjectContextService } from '../project-context/service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -165,6 +166,10 @@ export class ReviewRunExecutor {
 
     runLog.info(`Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`);
 
+    // Declared outside try/catch so it's available in both success and failure
+    // trace paths (the failure trace also records which context docs were expected).
+    let specsReadEntries: SpecReadEntry[] = [];
+
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
       // key is missing — caught below and persisted as a failed run.)
@@ -205,6 +210,27 @@ export class ReviewRunExecutor {
         runLog.event('info', `${skillBodies.length} skill(s) attached`);
       }
 
+      // ---- Project context: resolve attached context docs -------------------
+      // Resolved BEFORE reviewPullRequest() so the array is available in both
+      // the success path (trace line ~320) and the failure path (traceFromBuffer).
+      const contextService = new ProjectContextService(this.container);
+      const resolvedContextDocs = await contextService.resolveContextForAgent(
+        agent.id,
+        pull.repoId,
+        (msg) => runLog.info(msg),
+      );
+      specsReadEntries = resolvedContextDocs.map((d) => ({
+        path: d.path,
+        category: d.category,
+        tokens: d.tokens,
+      }));
+      const contextSpecs = resolvedContextDocs
+        .filter((d) => d.content.length > 0)
+        .map((d) => d.content);
+      if (contextSpecs.length > 0) {
+        runLog.event('info', `${contextSpecs.length} context doc(s) injected into prompt`);
+      }
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -228,6 +254,8 @@ export class ReviewRunExecutor {
         ...(pull.body ? { prDescription: pull.body } : {}),
         // Intent Layer — inject structured intent so the reviewer is scope-aware.
         ...(intent ? { prIntent: JSON.stringify(intent) } : {}),
+        // Project context — attached spec/doc files injected under ## Project context.
+        ...(contextSpecs.length > 0 ? { specs: contextSpecs } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -319,7 +347,7 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        specs_read: specsReadEntries,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -348,7 +376,7 @@ export class ReviewRunExecutor {
         })
         .catch(() => undefined);
       await this.repo
-        .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start))
+        .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start, specsReadEntries))
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
@@ -492,6 +520,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     grounding: string,
     durationMs = 0,
+    specsRead: SpecReadEntry[] = [],
   ): RunTrace {
     return {
       config: {
@@ -507,7 +536,7 @@ export class ReviewRunExecutor {
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],
-      specs_read: [],
+      specs_read: specsRead,
       log: this.container.runBus.buffer(runId).map((e) => ({ t: e.t, kind: e.kind, msg: e.msg })),
     };
   }

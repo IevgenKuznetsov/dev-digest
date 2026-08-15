@@ -1,0 +1,1 @@
+export { UploadDocModal } from "./UploadDocModal";
