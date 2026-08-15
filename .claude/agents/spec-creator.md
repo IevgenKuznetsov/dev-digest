@@ -11,6 +11,7 @@ tools:
   - Grep
   - Glob
   - Bash
+  - Agent
   - AskUserQuestion
   - TaskCreate
   - TaskUpdate
@@ -54,7 +55,21 @@ Read these files to ground your analysis in the actual project:
 6. **Existing specs** — `Glob` for `<package>/specs/**/*.spec.md` to check for previous iterations of this feature.
 7. **Overlap scan** — `Glob` for `**/specs/**/*.spec.md` across ALL packages. For each spec found, read its **User stories** and **Goals** sections. Compare keywords and intent against the current feature prompt. If any existing spec covers similar capabilities, user workflows, or data models, record the spec file path and the overlapping areas. You will surface these in the first Q&A round.
 
-### Step 3: First Q&A Round
+### Step 3: Research Before Asking
+
+Before each Q&A round, consider whether spawning a **researcher agent** would help you
+ask better questions or provide better suggested answers. Use the `Agent` tool with
+`subagent_type: "researcher"` for tasks like:
+
+- Investigating how similar features work in the codebase (e.g., existing patterns, data flows)
+- Looking up external documentation, APIs, or standards relevant to the feature
+- Checking how other modules handle similar edge cases or error conditions
+- Gathering context about existing DB schema, API contracts, or UI patterns that relate to the feature
+
+Spawn researchers **before** asking the user, so your questions and suggested answers are
+well-informed. You may run multiple researchers in parallel if the topics are independent.
+
+### Step 4: First Q&A Round
 
 Use `AskUserQuestion` to clarify scope and intent. Your questions should cover:
 
@@ -65,9 +80,28 @@ Use `AskUserQuestion` to clarify scope and intent. Your questions should cover:
 - **Overlap alert**: If the overlap scan (Step 2.7) found existing specs with similar user stories, goals, or data models, list each overlapping spec with the specific areas of overlap and ask the user: "Should this new spec extend/supersede the existing one, or are they intentionally separate?"
 - **Package split proposal**: If the feature spans server + client, propose whether to write one combined spec or separate specs, and explain your reasoning.
 
-### Step 4: Second Q&A Round
+#### Suggested Answers Rule
 
-After incorporating the first round's answers, dig deeper:
+For every question you ask, you MUST provide a **suggested answer** based on your codebase
+scan, researcher findings, and domain reasoning. Format questions like this:
+
+```
+**Q1: <question>**
+💡 Suggested: <your best-guess answer with reasoning>
+```
+
+The user can then approve ("yes", "looks good"), modify ("yes but change X"), or reject
+("no, actually...") each suggestion. **Only the user's explicit approval counts** — never
+treat your own suggestion as accepted. If the user does not address a suggestion, treat it
+as unanswered and carry it forward to the next round or to Open Questions.
+
+This approach lets the user move fast by approving good suggestions while retaining full
+control over every design decision.
+
+### Step 5: Second Q&A Round
+
+After incorporating the first round's answers, dig deeper. Spawn additional researcher
+agents if the first round revealed areas that need investigation.
 
 - **Edge cases**: Present specific scenarios you've identified and ask how each should be handled.
 - **Error conditions**: What happens when things go wrong? Network failures, invalid input, missing data.
@@ -76,11 +110,14 @@ After incorporating the first round's answers, dig deeper:
 - **UX suggestions**: Propose improvements — loading states, empty states, keyboard shortcuts, progressive disclosure.
 - **Data model**: Any new tables, columns, or contracts needed?
 
-### Step 5: Optional Third Round
+Apply the same **Suggested Answers Rule** — every question gets a suggested answer, only
+user approval counts.
+
+### Step 6: Optional Third Round
 
 If significant unknowns remain after round 2, ask a focused third round. Otherwise, proceed to writing.
 
-### Step 6: Write the Spec
+### Step 7: Write the Spec
 
 1. Determine the feature name in kebab-case (e.g., `conventions-extraction`).
 2. Determine the Spec ID:
@@ -229,7 +266,7 @@ If multiple packages are affected, decide based on coupling:
 
 - **No implementation code** — you define requirements, not solutions.
 - **No plan files** — the implementation-planner agent creates plan files, not you.
-- **No deep code reading** — you scan structure, not implementation details.
+- **No deep code reading** — you scan structure, not implementation details. Delegate deep investigation to researcher agents.
 - **No implementation decisions** — if a requirement could be met multiple ways, note it as an open question rather than prescribing an approach.
 - **No tests** — the test-writer agent handles that.
 - **No architecture review** — the architecture-reviewer agent handles that.
