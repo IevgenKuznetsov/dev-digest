@@ -72,6 +72,32 @@ Before producing any plan, you MUST read and internalize:
 6. **`server/src/vendor/shared/`** — existing Zod contracts. Never plan to edit these, only add new files.
 7. **`server/src/db/schema/`** — existing Drizzle table definitions.
 
+#### 2a: Impact Analysis — Find ALL Read/Write Sites
+
+For every field, type, or contract you plan to change:
+
+1. **Grep for ALL consumers** — find every file that reads, writes, imports, or references the thing you're changing. Not just the obvious ones. Include test fixtures, seed data, CI paths, and trace builders.
+2. **Trace persistence** — if the changed data is stored (DB JSONB, files, caches), determine whether old persisted data will break under the new schema. Zod `.parse()` on old JSONB is a common trap.
+3. **Map every write path** — find ALL code paths that produce/write the data, not just the primary one. Secondary write paths (e.g., `trace-builder.ts` alongside `run-executor.ts`, CI agents alongside local agents) are easy to miss and will produce data in the old format.
+4. **Check test fixtures** — grep for the field name in test files. Test fixtures with hardcoded values will break if the schema changes underneath them.
+
+If you find multiple write paths or persisted data that would break, the plan MUST use a backward-compatible approach (union types, optional fields, normalizers) rather than a direct replacement.
+
+#### 2b: Dependency Verification
+
+For every external library or tool the plan requires:
+
+1. **Check if already installed** — grep `package.json` for the dependency before assuming it needs to be added.
+2. **Check if an alternative exists** — grep imports in `src/` for similar libraries already in use (e.g., don't add `globby` if `fast-glob` is already used, or vice versa).
+3. **Verify version compatibility** — if adding a new Fastify plugin, check the Fastify version in `package.json` and confirm the plugin supports it.
+
+#### 2c: Client Utility Verification
+
+When the plan involves the client making requests in a new way (FormData, streaming, etc.):
+
+1. **Read the actual fetch helper** — don't assume how `apiFetch` or similar utilities work. Read the implementation and verify your proposed usage will actually work.
+2. **Test your fix mentally** — trace through the code with your proposed arguments. If you say "pass `headers: {}` to override," verify that an empty object spread actually overrides a previously set header (it doesn't).
+
 Use Grep and Glob to discover files. Use Read for content. Use `git log` via Bash for recent changes.
 
 ### Phase 3: Requirements Review & Clarifying Questions
@@ -278,17 +304,41 @@ After user approval, save to `<package>/specs/<feature-name>/<feature-name>_plan
 
 Before delivering the plan, verify:
 
+**Completeness**
 - [ ] Plan-Completeness Gate passed — coverage matrix shows all criteria COVERED, no GAPs remain.
 - [ ] At least one round of clarifying questions was asked.
 - [ ] Recommendations were presented to the user before finalizing.
 - [ ] Multi-agent permission was obtained (if applicable).
 - [ ] Every step has a Skills tag — implementor knows what to invoke.
 - [ ] Every step has an "Addresses" field linking back to spec criteria.
+
+**Codebase accuracy**
 - [ ] Every file path is verified to exist (for modifications) or has a clear parent directory (for creation).
 - [ ] Architecture constraints section references actual CLAUDE.md / INSIGHTS.md rules.
 - [ ] No step asks to edit vendor/shared/ existing files.
 - [ ] Migration steps are explicit if schema changes are planned.
 - [ ] Test strategy uses correct suffix convention (.test.ts vs .it.test.ts).
 - [ ] Dependencies between steps are declared.
-- [ ] Risks are identified with mitigations, not just listed.
 - [ ] Plan file path matches `<package>/specs/<feature-name>/<feature-name>_plan.md`.
+
+**Impact analysis (Phase 2a)**
+- [ ] Every schema/contract change has ALL read sites, write sites, and test fixtures identified via grep.
+- [ ] Persisted data (JSONB columns, files) checked for backward compatibility with new schemas.
+- [ ] ALL write paths identified — not just the primary one. Secondary paths (trace builders, CI agents, seed scripts) accounted for.
+- [ ] Test fixtures with hardcoded values verified to pass under new schemas.
+
+**Dependencies (Phase 2b)**
+- [ ] Every new library dependency verified as not-already-installed and version-compatible.
+- [ ] No duplicate libraries added when an equivalent already exists in the project.
+
+**Security & multi-tenancy**
+- [ ] Join table mutations (attach/detach) validate that referenced IDs belong to the same workspace. FK constraints alone are insufficient for multi-tenant isolation.
+- [ ] File system operations validate paths against traversal (resolve + startsWith boundary check).
+- [ ] Client-side fetch helpers verified to work correctly with the planned request format (FormData, streaming, etc.) by reading actual implementation.
+
+**Concurrency**
+- [ ] Check-then-act patterns (read state → decide → write) identified and replaced with atomic alternatives (transactions, unique constraints, advisory locks). TOCTOU = bug.
+- [ ] Disk reads that may fail (file deleted between scan and use) have explicit error handling strategy — skip with warning vs fail the operation.
+
+**Risks**
+- [ ] Risks are identified with mitigations, not just listed.
