@@ -1,7 +1,8 @@
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { resolve, dirname, sep, basename } from 'node:path';
+import { dirname, basename } from 'node:path';
 import type { Container } from '../../platform/container.js';
 import { AppError, NotFoundError, ValidationError } from '../../platform/errors.js';
+import { resolveAndValidatePath } from '../../platform/paths.js';
 import type { ContextDocCategory, SpecReadEntry } from '@devdigest/shared';
 import { ProjectContextRepository } from './repository.js';
 import type { ContextDocRow } from './repository.js';
@@ -131,7 +132,7 @@ export class ProjectContextService {
     for (const relativePath of paths) {
       let absolutePath: string;
       try {
-        absolutePath = this.resolveAndValidatePath(repoRow.clonePath, relativePath);
+        absolutePath = resolveAndValidatePath(repoRow.clonePath, relativePath);
       } catch {
         continue;
       }
@@ -174,7 +175,7 @@ export class ProjectContextService {
       throw new AppError('file_error', 'Repository clone directory not available', 400);
     }
 
-    const filePath = this.resolveAndValidatePath(repoRow.clonePath, doc.path);
+    const filePath = resolveAndValidatePath(repoRow.clonePath, doc.path);
     try {
       return await readFile(filePath, 'utf8');
     } catch (err: unknown) {
@@ -200,7 +201,7 @@ export class ProjectContextService {
       throw new AppError('file_error', 'Repository clone directory not available', 400);
     }
 
-    const filePath = this.resolveAndValidatePath(repoRow.clonePath, doc.path);
+    const filePath = resolveAndValidatePath(repoRow.clonePath, doc.path);
     try {
       await writeFile(filePath, content, 'utf8');
     } catch (err) {
@@ -234,7 +235,7 @@ export class ProjectContextService {
     }
 
     const relativePath = `${directory}/${filename}`;
-    const filePath = this.resolveAndValidatePath(repoRow.clonePath, relativePath);
+    const filePath = resolveAndValidatePath(repoRow.clonePath, relativePath);
 
     // Check the file doesn't already exist.
     try {
@@ -285,7 +286,7 @@ export class ProjectContextService {
     }
 
     const relativePath = `${directory}/${name}`;
-    const dirPath = this.resolveAndValidatePath(repoRow.clonePath, relativePath);
+    const dirPath = resolveAndValidatePath(repoRow.clonePath, relativePath);
 
     try {
       await mkdir(dirPath, { recursive: true });
@@ -401,7 +402,7 @@ export class ProjectContextService {
     for (const doc of deduped) {
       let filePath: string;
       try {
-        filePath = this.resolveAndValidatePath(repoRow.clonePath, doc.path);
+        filePath = resolveAndValidatePath(repoRow.clonePath, doc.path);
       } catch {
         onWarning?.(`context doc path traversal rejected: ${doc.path}, skipping`);
         continue;
@@ -456,23 +457,6 @@ export class ProjectContextService {
     const repo = await this.repo.getRepoById(repoId);
     if (!repo) throw new NotFoundError('Repository not found');
     return repo;
-  }
-
-  /**
-   * Resolve a relative path against the clone root and verify it stays within
-   * the clone root (path traversal guard). Rejects with 400 if traversal is detected.
-   */
-  private resolveAndValidatePath(clonePath: string, relativePath: string): string {
-    const resolved = resolve(clonePath, relativePath);
-    const normalClone = resolve(clonePath);
-    if (!resolved.startsWith(normalClone + sep) && resolved !== normalClone) {
-      throw new AppError(
-        'path_traversal',
-        'Path traversal detected — access to files outside the repository is not allowed',
-        400,
-      );
-    }
-    return resolved;
   }
 
   private categoryForDirectory(
