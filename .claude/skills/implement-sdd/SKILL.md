@@ -35,7 +35,7 @@ Before starting the pipeline:
 | 4 | Test writing | Yes (opt-in) | test-writer |
 | 5 | Reviewer selection | Yes (multi-select) | None |
 | 6 | Run reviewers | No | Selected reviewers (parallel) |
-| 7 | Issue handling | Yes (per-issue) | implementor (if fix) |
+| 7 | Issue handling | Yes (per-issue) | implementor (CRITICAL only); Edit tool for non-critical |
 | 8 | Final documentation | No | doc-writer |
 | 9 | Engineering insight | No | None (Skill invocation) |
 
@@ -286,11 +286,13 @@ If there are any non-critical findings remaining:
 
 3. **If yes:**
    - Ask which issues to fix (by number)
-   - Spawn implementor to address the selected issues
-   - After fix, re-run only the affected reviewers
+   - For each selected issue: read the file at the referenced path and apply the fix directly using the Edit tool in the main conversation context. Do NOT spawn an implementor agent for non-critical fixes — these are small targeted changes that should be made inline.
+   - After all edits are applied, re-run only the affected reviewers
    - Present updated findings and return to Tier 2 assessment
 
 4. **If no:** Proceed to Step 8.
+
+> **Rationale:** Non-critical fixes are small and localized. Spawning a full implementor agent for a one-line edit wastes tokens and context. Reserve `implementor` for CRITICAL issues that require broad rework across multiple files.
 
 If there are zero findings across all reviewers, print "No issues found by any reviewer." and proceed to Step 8.
 
