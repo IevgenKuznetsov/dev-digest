@@ -47,6 +47,7 @@ Store these values internally:
 - `feature_details` — the full description provided
 - `qa_rounds` — integer, minimum 1
 - `target_package` — `server`, `client`, `reviewer-core`, or `cross-package`
+- `qa_history` — empty list, will accumulate `{ round, questions_and_answers }` entries
 
 Print a brief summary of what you collected and show the status block, then proceed to Phase 2.
 
@@ -105,24 +106,81 @@ When spec-creator returns a set of questions:
 
 4. **Wait for user approval** — Do NOT send any answers to spec-creator until the user has explicitly approved or edited the answers. If the user edits answers, confirm the final set before proceeding.
 
-5. **Continue spec-creator** — Use SendMessage to resume the spec-creator agent with the approved answers:
+5. **Record the round** — Append to `qa_history`:
    ```
-   SendMessage:
-     to: spec-creator
-     message: |
-       Here are the answers to your questions:
-
-       <approved Q&A pairs, formatted clearly>
-
-       <if more rounds remain>
-       Please proceed to round <N> of <qa_rounds>: ask all clarifying questions for this round.
-       </if>
-       <if this was the final round>
-       All rounds complete. Please now produce the spec file.
-       </if>
+   { round: N, questions_and_answers: "<approved Q&A pairs, one per line: Q: ... / A: ...>" }
    ```
 
-6. **Wait for next response** — spec-creator will either ask the next round of questions (repeat from step 1) or signal completion with `SPEC_COMPLETE: <path>`.
+6. **Spawn the next spec-creator** — Spawn a fresh `spec-creator` agent with all accumulated context. **Never use SendMessage** — spec-creator cannot be continued via relay; always re-spawn with the full history in the prompt.
+
+   **If more rounds remain (current round < qa_rounds):**
+   ```
+   Agent tool:
+     subagent_type: spec-creator
+     prompt: |
+       You are continuing a spec creation session. Rounds 1 through <N> are complete
+       and approved. You are now in Round <N+1> of <qa_rounds>.
+
+       DO NOT re-ask any question from a previous round. All prior answers are final.
+       Jump directly to asking Round <N+1> questions.
+
+       Feature name: <feature_name>
+       Target package: <target_package>
+
+       Feature description:
+       <feature_details>
+
+       <if design_artifacts != none>
+       Design artifacts:
+       <design_artifacts>
+       </if>
+
+       ## Resolved decisions (Rounds 1–<N>)
+       <for each entry in qa_history:>
+       ### Round <round>
+       <questions_and_answers verbatim>
+
+       Configuration:
+       - You are in Round <N+1> of <qa_rounds>. Ask all Round <N+1> clarifying questions now.
+       - After the final round is answered, produce the spec file at:
+           <target_package>/specs/<feature_name>/<feature_name>.spec.md
+       - After writing the file, output: SPEC_COMPLETE: <file_path>
+
+       Begin Round <N+1> now.
+   ```
+
+   **If this was the final round (current round = qa_rounds):**
+   ```
+   Agent tool:
+     subagent_type: spec-creator
+     prompt: |
+       You are completing a spec creation session. All <qa_rounds> rounds of clarifying
+       questions have been answered. Produce the final spec file now.
+
+       DO NOT ask any more questions. Proceed directly to writing the spec.
+
+       Feature name: <feature_name>
+       Target package: <target_package>
+
+       Feature description:
+       <feature_details>
+
+       <if design_artifacts != none>
+       Design artifacts:
+       <design_artifacts>
+       </if>
+
+       ## All Resolved Decisions (Rounds 1–<qa_rounds>)
+       <for each entry in qa_history:>
+       ### Round <round>
+       <questions_and_answers verbatim>
+
+       Produce the spec file at:
+         <target_package>/specs/<feature_name>/<feature_name>.spec.md
+       After writing the file, output: SPEC_COMPLETE: <file_path>
+   ```
+
+7. **Wait for response** — spec-creator will either return the next round's questions (repeat from step 1) or output `SPEC_COMPLETE: <path>`.
 
 ### Round Tracking
 
@@ -218,7 +276,22 @@ Agent tool:
     Spec file: <spec_path>
     Plan file: <plan_path>
 
-    For every requirement in the spec, determine whether the plan covers it.
+    **Step 0 — Enumerate all requirements first.**
+    Before auditing, produce a numbered inventory of ALL testable requirements
+    from the spec. Include every item from these categories:
+      - EARS acceptance criteria (AC-U*, AC-E*, AC-S*, AC-O*, AC-X*) — one entry each
+      - Edge cases with a distinct behavioral requirement not already captured
+        by an AC (cite from the edge cases table by number)
+      - Non-functional requirements with a testable aspect (performance targets,
+        security constraints, accessibility rules)
+      - Untrusted-input validation rules with distinct behavior
+
+    Label each entry's source: [AC] [EDGE] [NFR] [UNTRUSTED]
+    This enumeration is your complete audit checklist — do not add or remove
+    items during the audit phase.
+
+    **Step 1 — Audit each requirement.**
+    For every item in your Step 0 checklist, determine whether the plan covers it.
     Use this format for each:
 
     REQ-<N>: <requirement summary from spec>
@@ -243,20 +316,70 @@ Wait for the cross-review to complete.
 
 Display the full cross-review output to the user.
 
-If verdict is `NEEDS REVISION` or there are any PARTIAL/MISSING items:
+Then classify the result using these counts from the summary:
+- `partial_count` = number of PARTIAL requirements
+- `missing_count` = number of MISSING requirements
+- `flag_count` = number of risk flags
 
-> "The cross-review found gaps. Here are the options:
+**Also classify each PARTIAL/MISSING gap as:**
+- **STRUCTURAL** — an entire step, error path, or architectural decision is absent or wrong; requires planner re-run or significant rewrite
+- **TARGETED** — a single value, one-line constraint, or missing note in an existing step; can be fixed with a direct Edit to the plan file
+
+---
+
+### Case A — verdict READY
+
+> "Cross-review passed — all spec requirements are covered by the plan."
+
+Proceed to Final Presentation.
+
+---
+
+### Case B — verdict NEEDS REVISION, partial_count = 0, missing_count = 0 (risk flags only)
+
+No requirement gaps exist. Do NOT offer re-run planner. Present:
+
+> "The cross-review found **N risk flags** but no requirement gaps (0 PARTIAL, 0 MISSING).
+> Options:
+> 1. **Accept as-is** — risk flags noted for the implementer; proceed to final presentation
+> 2. **Targeted edit** — I will add the risk flag notes directly to the plan with Edit tool, then re-run the review
+> 3. **Manually fix** — edit the plan directly; tell me when done and I'll re-run"
+
+Handle choice:
+- **Accept as-is**: Proceed to Final Presentation.
+- **Targeted edit**: Apply Edit tool calls to the plan file for each flag → re-run cross-review (Phase 5).
+- **Manually fix**: Wait for user confirmation, read the updated plan, re-run cross-review.
+
+---
+
+### Case C — verdict NEEDS REVISION, all gaps are TARGETED (no STRUCTURAL gaps)
+
+> "The cross-review found gaps — all are targeted fixes (single values or missing clauses).
+> Options:
+> 1. **Targeted edit** *(recommended)* — I will apply the fixes directly to the plan with Edit tool, then re-run the review
+> 2. **Re-run planner** — full planner re-run with gaps fed back (~100k tokens)
+> 3. **Accept as-is** — proceed with current plan, gaps noted for implementation
+> 4. **Manually fix** — edit the plan directly; tell me when done"
+
+Handle choice:
+- **Targeted edit**: Apply Edit tool calls to the plan file for each gap → re-run cross-review.
+- **Re-run planner**: Feed cross-review output and gap list back to implementation-planner (Phase 4 style) → re-run Phase 5.
+- **Accept as-is**: Proceed to Final Presentation.
+- **Manually fix**: Wait for user confirmation, read the updated plan, re-run cross-review.
+
+---
+
+### Case D — verdict NEEDS REVISION, at least one STRUCTURAL gap
+
+> "The cross-review found structural gaps. Options:
 > 1. **Re-run planner** — I will feed the gaps back to implementation-planner and generate a revised plan
 > 2. **Accept as-is** — proceed with the current plan (note the gaps for implementation)
-> 3. **Manually fix** — you will edit the plan file directly; tell me when done and I will re-run the cross-review"
+> 3. **Manually fix** — edit the plan directly; tell me when done and I will re-run the cross-review"
 
-Handle user's choice:
-- **Re-run planner**: Feed the cross-review output and gap list back to implementation-planner (Phase 4 style), then re-run Phase 5.
-- **Accept as-is**: Continue to final presentation.
-- **Manually fix**: Wait for user confirmation, read the updated plan, re-run the cross-review agent.
-
-If verdict is `READY` with zero MISSING items:
-> "Cross-review passed — all spec requirements are covered by the plan."
+Handle choice:
+- **Re-run planner**: Feed cross-review output and gap list back to implementation-planner (Phase 4 style) → re-run Phase 5.
+- **Accept as-is**: Proceed to Final Presentation.
+- **Manually fix**: Wait for user confirmation, read the updated plan, re-run cross-review.
 
 ---
 
@@ -321,3 +444,4 @@ States: `PENDING`, `IN PROGRESS`, `COMPLETE`, `SKIPPED`, `FAILED`
 - Does not write the spec or plan itself — delegates entirely to spec-creator and implementation-planner
 - Does not auto-approve any user decision point
 - Does not send answers to spec-creator before user confirms them
+- Does not use SendMessage to continue spec-creator — always re-spawns with full accumulated Q&A history
