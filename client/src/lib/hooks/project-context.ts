@@ -126,6 +126,44 @@ export function useUploadContextDoc(repoId: string | null | undefined) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Repo-scan: find by patterns (no import) + import selected paths
+// ---------------------------------------------------------------------------
+
+/**
+ * Lazily scan the repo clone for .md files matching the given patterns.
+ * Call with enabled=true only when the user triggers the search.
+ */
+export function useContextFind(
+  repoId: string | null | undefined,
+  patterns: string,
+  enabled: boolean,
+  /** Increment to force a re-fetch even when patterns haven't changed. */
+  searchKey = 0,
+) {
+  return useQuery({
+    queryKey: ["context-find", repoId, patterns, searchKey],
+    queryFn: () =>
+      api.get<{ paths: string[] }>(
+        `/repos/${repoId}/context/find?patterns=${encodeURIComponent(patterns)}`,
+      ),
+    enabled: !!repoId && enabled,
+    staleTime: 0,
+  });
+}
+
+/** Import a selected list of repo-relative paths into the context DB. */
+export function useContextImport(repoId: string | null | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paths: string[]) =>
+      api.post<ContextDoc[]>(`/repos/${repoId}/context/import`, { paths }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["context-docs", repoId] });
+    },
+  });
+}
+
 export function useCreateContextFolder(repoId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({

@@ -19,6 +19,7 @@ import { EmptyState } from "../EmptyState";
 import { CreateDocModal } from "../CreateDocModal";
 import { UploadDocModal } from "../UploadDocModal";
 import { CreateFolderModal } from "../CreateFolderModal";
+import { RepoScanModal } from "../RepoScanModal/RepoScanModal";
 import { s } from "./styles";
 import { formatRelativeTime } from "./helpers";
 
@@ -34,6 +35,7 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
   const [showCreateDoc, setShowCreateDoc] = React.useState(false);
   const [showUpload, setShowUpload] = React.useState(false);
   const [showCreateFolder, setShowCreateFolder] = React.useState(false);
+  const [showScanRepo, setShowScanRepo] = React.useState(false);
 
   const { data: docs, isLoading } = useContextDocs(repoId, search || undefined);
   const { data: docContent } = useContextDocContent(repoId, selectedDocId);
@@ -111,12 +113,22 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
   if (isEmpty) {
     return (
       <div style={{ display: "flex", flex: 1, height: "calc(100vh - 52px)" }}>
-        <EmptyState onAdd={() => setShowCreateDoc(true)} />
-        {showCreateDoc && (
-          <CreateDocModal
-            onClose={() => setShowCreateDoc(false)}
-            onSubmit={handleCreateDoc}
-            loading={createDoc.isPending}
+        <EmptyState
+          onUpload={() => setShowUpload(true)}
+          onScanRepo={() => setShowScanRepo(true)}
+        />
+        {showUpload && (
+          <UploadDocModal
+            onClose={() => setShowUpload(false)}
+            onSubmit={handleUpload}
+            loading={uploadDoc.isPending}
+          />
+        )}
+        {showScanRepo && (
+          <RepoScanModal
+            repoId={repoId}
+            onClose={() => setShowScanRepo(false)}
+            onImported={() => setShowScanRepo(false)}
           />
         )}
       </div>
@@ -156,6 +168,14 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
             </button>
             <button
               style={s.toolBtn}
+              title="Search repository for spec files"
+              onClick={() => setShowScanRepo(true)}
+              type="button"
+            >
+              <Icon.Search size={15} />
+            </button>
+            <button
+              style={s.toolBtn}
               title="Refresh / re-scan"
               onClick={() => scan.mutate()}
               type="button"
@@ -186,9 +206,11 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
             >
               <Icon.FileText size={13} style={{ flexShrink: 0 }} />
               <span style={s.fileName} title={doc.path}>
-                {doc.path.split("/").pop()}
+                {doc.path}
               </span>
-              <span style={s.fileCategory}>{doc.category}</span>
+              <span style={s.fileCategory(doc.category)}>
+                {doc.category === "docs" ? "plan" : doc.category}
+              </span>
             </div>
           ))}
         </div>
@@ -304,6 +326,13 @@ export function ProjectContextView({ repoId }: ProjectContextViewProps) {
           onClose={() => setShowCreateFolder(false)}
           onSubmit={handleCreateFolder}
           loading={createFolder.isPending}
+        />
+      )}
+      {showScanRepo && (
+        <RepoScanModal
+          repoId={repoId}
+          onClose={() => setShowScanRepo(false)}
+          onImported={() => setShowScanRepo(false)}
         />
       )}
     </div>

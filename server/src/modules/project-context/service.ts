@@ -1,5 +1,5 @@
-import { readFile, writeFile, mkdir, access, unlink } from 'node:fs/promises';
-import { resolve, dirname, sep } from 'node:path';
+import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { resolve, dirname, sep, basename } from 'node:path';
 import type { Container } from '../../platform/container.js';
 import { AppError, NotFoundError, ValidationError } from '../../platform/errors.js';
 import type { ContextDocCategory, SpecReadEntry } from '@devdigest/shared';
@@ -78,6 +78,76 @@ export class ProjectContextService {
     await this.repo.removeStale(repoId, scanned.map((f) => f.path));
 
     return upserted;
+  }
+
+  // ---- Repo-scan (find without import) ------------------------------------
+
+  /**
+   * Scan the repo clone for .md files matching user-supplied glob patterns.
+   * Returns relative paths only — nothing is written to the DB.
+   */
+  async findByPatterns(
+    workspaceId: string,
+    repoId: string,
+    patterns: string[],
+  ): Promise<string[]> {
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('scan_error', 'Repository clone directory not available', 400);
+    }
+    try {
+      await access(repoRow.clonePath);
+    } catch {
+      throw new AppError('scan_error', 'Repository clone directory does not exist', 400);
+    }
+    const scanned = await scanDirectory(repoRow.clonePath, patterns);
+    return scanned.map((f) => f.path);
+  }
+
+  /**
+   * Import specific repo files (by relative path) into the context DB.
+   * Files that are unreadable or fail the path-traversal guard are silently skipped.
+   */
+  async importPaths(
+    workspaceId: string,
+    repoId: string,
+    paths: string[],
+  ): Promise<ContextDocRow[]> {
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('file_error', 'Repository clone directory not available', 400);
+    }
+
+    const now = new Date();
+    const toUpsert: Array<{
+      workspaceId: string;
+      repoId: string;
+      path: string;
+      category: ContextDocCategory;
+      tokens: number;
+      scannedAt: Date;
+    }> = [];
+
+    for (const relativePath of paths) {
+      let absolutePath: string;
+      try {
+        absolutePath = this.resolveAndValidatePath(repoRow.clonePath, relativePath);
+      } catch {
+        continue;
+      }
+      let content: string;
+      try {
+        content = await readFile(absolutePath, 'utf8');
+      } catch {
+        continue;
+      }
+      const tokens = countTokens(content);
+      const category = this.categoryForPath(relativePath);
+      toUpsert.push({ workspaceId, repoId, path: relativePath, category, tokens, scannedAt: now });
+    }
+
+    if (toUpsert.length === 0) return [];
+    return this.repo.upsertDocs(toUpsert);
   }
 
   // ---- Doc listing / retrieval ---------------------------------------------
@@ -196,22 +266,10 @@ export class ProjectContextService {
   }
 
   async deleteDoc(workspaceId: string, docId: string): Promise<void> {
-    const doc = await this.getDoc(workspaceId, docId);
-    const repoRow = await this.getRepoRowById(doc.repoId);
-
-    if (repoRow.clonePath) {
-      const filePath = this.resolveAndValidatePath(repoRow.clonePath, doc.path);
-      try {
-        await unlink(filePath);
-      } catch (err) {
-        const nodeErr = err as NodeJS.ErrnoException;
-        if (nodeErr.code !== 'ENOENT') {
-          throw new AppError('file_error', `Failed to delete file: ${(err as Error).message}`, 500);
-        }
-        // ENOENT is fine — the file is already gone; just clean up the DB row.
-      }
-    }
-
+    // Ownership check only — does NOT remove the file from disk.
+    // Files belong to the repository; removing them here would be destructive
+    // and irreversible. Only the DB record (and its agent/skill links) is removed.
+    await this.getDoc(workspaceId, docId);
     await this.repo.deleteById(docId);
   }
 
@@ -425,6 +483,15 @@ export class ProjectContextService {
     if (directory === 'specs') return 'specs';
     if (directory === 'docs') return 'docs';
     return 'insights';
+  }
+
+  /** Infer category from a relative path (used for repo-scan imports). */
+  private categoryForPath(relativePath: string): ContextDocCategory {
+    const name = basename(relativePath);
+    if (name === 'INSIGHTS.md' || /insight/i.test(name)) return 'insights';
+    if (/(?:^|\/)specs\//.test(relativePath)) return 'specs';
+    if (/(?:^|\/)docs\//.test(relativePath)) return 'docs';
+    return 'other';
   }
 
   private toResult(doc: ContextDocRow): ContextDocResult {

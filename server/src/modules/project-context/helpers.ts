@@ -65,3 +65,33 @@ export const ListDocsQuery = z.object({
   search: z.string().optional(),
 });
 export type ListDocsQuery = z.infer<typeof ListDocsQuery>;
+
+// ============================================================ Repo-scan helpers
+
+/** Default glob patterns for the "search repository" feature. */
+export const DEFAULT_SCAN_PATTERNS = '**/*.md';
+
+/**
+ * Convert user-facing comma-separated patterns (e.g. "*spec.md") into
+ * fast-glob patterns ("**\/*spec.md"). Patterns that already contain a "/"
+ * are left as-is so users can express directory-scoped matches.
+ */
+export function parseUserPatterns(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .map((p) => (p.includes('/') ? p : `**/${p}`));
+}
+
+export const FindByPatternsQuery = z.object({
+  /** Comma-separated user patterns, defaults to DEFAULT_SCAN_PATTERNS server-side. */
+  patterns: z.string().optional(),
+});
+export type FindByPatternsQuery = z.infer<typeof FindByPatternsQuery>;
+
+export const ImportFilesBody = z.object({
+  /** Relative paths (from repo root) of files to import into the context DB. */
+  paths: z.array(z.string()).min(1).max(100),
+});
+export type ImportFilesBody = z.infer<typeof ImportFilesBody>;

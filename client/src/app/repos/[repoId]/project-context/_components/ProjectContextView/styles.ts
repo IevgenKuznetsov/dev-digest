@@ -90,16 +90,28 @@ export const s = {
     whiteSpace: "nowrap",
   } satisfies CSSProperties,
 
-  fileCategory: {
-    fontSize: 10,
-    color: "var(--text-muted)",
-    background: "var(--bg-elevated)",
-    padding: "1px 5px",
-    borderRadius: 3,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    flexShrink: 0,
-  } satisfies CSSProperties,
+  fileCategory: (category: string): CSSProperties => {
+    const base: CSSProperties = {
+      fontSize: 10,
+      padding: "1px 5px",
+      borderRadius: 3,
+      textTransform: "uppercase",
+      letterSpacing: "0.04em",
+      flexShrink: 0,
+      fontWeight: 600,
+    };
+    if (category === "specs") {
+      return { ...base, color: "#22c55e", background: "rgba(34,197,94,0.12)" };
+    }
+    if (category === "insights") {
+      return { ...base, color: "#2dd4bf", background: "rgba(45,212,191,0.12)" };
+    }
+    if (category === "docs") {
+      return { ...base, color: "#60a5fa", background: "rgba(96,165,250,0.12)" };
+    }
+    // other
+    return { ...base, color: "var(--text-muted)", background: "var(--bg-elevated)" };
+  },
 
   footer: {
     padding: "10px 14px",

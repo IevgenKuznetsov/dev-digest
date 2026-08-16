@@ -14,6 +14,10 @@ import {
   CreateFolderBody,
   SetContextBody,
   ListDocsQuery,
+  FindByPatternsQuery,
+  ImportFilesBody,
+  DEFAULT_SCAN_PATTERNS,
+  parseUserPatterns,
 } from './helpers.js';
 
 interface MultipartFile {
@@ -206,6 +210,40 @@ export default async function projectContextRoutes(appBase: FastifyInstance) {
       );
       reply.status(201);
       return doc;
+    },
+  );
+
+  // ---- Repo-scan (find without import) ------------------------------------
+
+  /**
+   * GET /repos/:repoId/context/find?patterns=...
+   * Scan the clone for .md files matching user-configured glob patterns.
+   * Returns matched relative paths without touching the DB.
+   */
+  app.get(
+    '/repos/:repoId/context/find',
+    { schema: { params: RepoIdParams, querystring: FindByPatternsQuery } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const raw = req.query.patterns ?? DEFAULT_SCAN_PATTERNS;
+      const patterns = parseUserPatterns(raw);
+      const paths = await service.findByPatterns(workspaceId, req.params.repoId, patterns);
+      return { paths };
+    },
+  );
+
+  /**
+   * POST /repos/:repoId/context/import
+   * Import a set of repo files (by relative path) into the context DB.
+   */
+  app.post(
+    '/repos/:repoId/context/import',
+    { schema: { params: RepoIdParams, body: ImportFilesBody } },
+    async (req, reply) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const docs = await service.importPaths(workspaceId, req.params.repoId, req.body.paths);
+      reply.status(201);
+      return docs;
     },
   );
 

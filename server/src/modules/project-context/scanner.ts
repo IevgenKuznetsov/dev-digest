@@ -39,10 +39,10 @@ export function validateFilename(name: string): { ok: true } | { ok: false; reas
   if (name.includes('..')) {
     return { ok: false, reason: 'Filename must not contain path traversal sequences (..)' };
   }
-  if (!/^[a-zA-Z0-9_-]+\.md$/.test(name)) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.\-]*\.md$/.test(name)) {
     return {
       ok: false,
-      reason: 'Filename must contain only alphanumeric characters, hyphens, and underscores, and end with .md',
+      reason: 'Filename must start with an alphanumeric character, contain only alphanumeric characters, hyphens, underscores, or dots, and end with .md',
     };
   }
   return { ok: true };
