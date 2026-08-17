@@ -130,6 +130,16 @@ Print status summary after this step.
 - If any agent reports "plan is wrong or incomplete" → surface the issue immediately and suggest returning to the implementation-planner
 - Print a summary of all agents' results: steps completed, files changed, tests passed/failed, deviations, issues discovered
 
+**Post-implementation sanity check:** Run this grep across the new module directories
+to catch bare property access expressions — dead no-ops left by interrupted refactors:
+
+```sh
+grep -rn "^\s*this\.[a-zA-Z_]\+;" <new_module_paths>
+```
+
+If any matches are found, fix them inline with the Edit tool before Step 4. This
+takes under 30 seconds and prevents a recurring [architecture-reviewer] LOW finding.
+
 Print status summary after this step.
 
 ### Step 4: Test Writing (Optional)

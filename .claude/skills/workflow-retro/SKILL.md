@@ -64,7 +64,7 @@ For each agent call, assign a cost tier using this table:
 | `Explore` (very thorough) | medium | ~50k |
 | `general-purpose` | medium | ~30k |
 | `researcher` | medium | ~25k |
-| `plan-verifier` | low | ~15k |
+| `plan-verifier` | low–high | ~15k (plan <200 lines) to ~80k (plan >500 lines) |
 | `architecture-reviewer` | medium | ~20k |
 | `security-reviewer` | medium | ~20k |
 | `test-writer` | medium | ~40k |

@@ -54,7 +54,11 @@ already made in the plan.
 3. For each step:
    a. Read the files you're about to modify (understand existing code first).
    b. Invoke tagged skills via the Skill tool (e.g., `skill: "fastify-best-practices"`).
-   c. Implement the change.
+   c. Implement the change. For steps that specify structured log output (e.g. "emit
+      a log entry containing model, prompt_tokens, completion_tokens, latency_ms"),
+      verify the actual return shape of any provider/adapter called in that step
+      BEFORE writing the log — do not assume field names match the spec's naming
+      convention (e.g. `tokensIn`/`tokensOut` vs `prompt_tokens`/`completion_tokens`).
    d. Run relevant tests.
    e. Mark the task complete.
 3. Produce the implementation report.
@@ -82,6 +86,9 @@ invoke the appropriate skill anyway. Use the Skill tool.
 ## Scope Discipline
 
 - **Only modify files listed in the plan** (or files the plan clearly implies, e.g., module index).
+- **Helpers files** — when a plan step lists a helpers/utilities file with specific
+  exported functions by name, treat each function as a separate checklist item.
+  Verify every named export is present before marking the step complete.
 - **Do NOT** refactor surrounding code, add docstrings, or "improve" unrelated code.
 - **Do NOT** perform security review or architecture review — other agents handle that.
 - **Do NOT** add error handling, validation, or features beyond what the plan specifies.
