@@ -9,7 +9,7 @@
  */
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button, EmptyState, Icon } from "@devdigest/ui";
 import { useOnboarding, useGenerateOnboarding } from "@/lib/hooks/onboarding";
 import { useActiveRepo } from "@/lib/repo-context";
@@ -17,6 +17,7 @@ import { useToast } from "@/lib/toast";
 import { SectionBlock } from "../SectionBlock";
 import { s } from "./styles";
 import { copyToClipboard } from "./helpers";
+import { GENERATION_PHASES } from "./constants";
 import type { OnboardingResponse } from "@devdigest/shared";
 
 interface OnboardingViewProps {
@@ -36,6 +37,30 @@ export function OnboardingView({ repoId }: OnboardingViewProps) {
   const isGenerating =
     generate.isPending ||
     (data != null && "status" in data && data.status === "generating");
+
+  // Track how long generation has been running so we can show phase labels.
+  const generatingStartRef = useRef<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      generatingStartRef.current = null;
+      setElapsedMs(0);
+      return;
+    }
+    if (generatingStartRef.current === null) {
+      generatingStartRef.current = Date.now();
+    }
+    const id = setInterval(() => {
+      setElapsedMs(Date.now() - (generatingStartRef.current ?? Date.now()));
+    }, 1_000);
+    return () => clearInterval(id);
+  }, [isGenerating]);
+
+  const phaseLabel = GENERATION_PHASES.reduce(
+    (label, phase) => (elapsedMs >= phase.afterMs ? phase.label : label),
+    GENERATION_PHASES[0].label,
+  );
 
   const tour = data != null && !("status" in data) ? (data as OnboardingResponse) : null;
   const isEmpty = !isLoading && !isGenerating && tour === null;
@@ -61,6 +86,7 @@ export function OnboardingView({ repoId }: OnboardingViewProps) {
       <main style={s.generatingRoot} aria-live="polite">
         <Icon.RefreshCw size={28} style={{ animation: "ddspin 1s linear infinite" }} />
         <p style={s.generatingText}>Generating&hellip;</p>
+        <p style={s.generatingPhase}>{phaseLabel}</p>
       </main>
     );
   }

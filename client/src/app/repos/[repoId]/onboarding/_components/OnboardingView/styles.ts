@@ -40,6 +40,11 @@ export const s = {
     fontSize: 15,
     color: "var(--text-secondary)",
   } as CSSProperties,
+  generatingPhase: {
+    fontSize: 13,
+    color: "var(--text-muted)",
+    marginTop: -8,
+  } as CSSProperties,
   sections: {
     display: "flex",
     flexDirection: "column",

@@ -49,8 +49,13 @@ export interface OnboardingGenerating {
 /**
  * Module-level in-memory lock: keyed by repoId, value is the generation promise.
  * Resolved/rejected promises are deleted via .finally().
+ *
+ * Safety-net TTL: if the underlying HTTP call hangs past withTimeout (e.g. adapter
+ * retry extends the total wall-clock time beyond the socket timeout), a 75s TTL
+ * timer auto-releases the lock so subsequent requests are not permanently blocked.
  */
 const generationLocks = new Map<string, Promise<OnboardingResult>>();
+const LOCK_TTL_MS = 75_000;
 
 export class OnboardingService {
   private repo: OnboardingRepository;
@@ -104,6 +109,13 @@ export class OnboardingService {
       generationLocks.delete(repoId);
     });
     generationLocks.set(repoId, promise);
+
+    // Safety-net TTL: release the lock if the Promise never settles (e.g. the LLM
+    // adapter's internal retry holds the underlying HTTP connection past the socket
+    // timeout). unref() prevents this timer from keeping the Node process alive.
+    const ttl = setTimeout(() => generationLocks.delete(repoId), LOCK_TTL_MS);
+    ttl.unref();
+    promise.then(() => clearTimeout(ttl), () => clearTimeout(ttl));
 
     return promise;
   }
