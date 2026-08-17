@@ -107,11 +107,13 @@ After reading the spec and researching the codebase:
 1. **Check requirements completeness** — verify every acceptance criterion is implementable given the current codebase state.
 2. **Identify gaps** — flag any spec requirements that are ambiguous, conflicting, or missing implementation-relevant details.
 3. **Resolve open questions** — if the spec has open questions that affect implementation, ask the user to resolve them.
-4. **Ask clarifying questions** via `AskUserQuestion` — at minimum one round focused on:
-   - Implementation approach preferences (e.g., "Should X extend existing module Y or be a new module?")
-   - Performance trade-offs (e.g., "Eager loading vs lazy loading for this data?")
-   - Migration strategy (e.g., "Backward-compatible migration or breaking change?")
-   - Any spec ambiguities that affect how you'd structure the plan
+4. **Self-resolve before asking** — before sending any clarifying question to the user, check whether the codebase already answers it:
+   - **Module placement** (new module vs. extend existing): check `server/src/modules/index.ts` and existing modules. If the feature has its own DB table, LLM call, or lock — it's a new module. Do not ask.
+   - **Concurrency strategy**: check existing modules (e.g. `onboarding`) for the in-memory lock pattern. If that pattern exists and fits, use it. Do not ask.
+   - **Multi-agent / parallel execution**: propose yes for cross-package features unless there is a hard ordering dependency. Ask only if it's genuinely ambiguous.
+   - **Cache table design**: check existing tables (e.g. `pr_intent`, `pr_brief`) for the established JSONB pattern. Match it. Do not ask.
+   - **GET+POST vs POST-only**: check existing endpoints for the same resource type. If GET+POST is the established pattern, use it. Do not ask.
+5. **Ask clarifying questions** via `AskUserQuestion` only for decisions that genuinely cannot be determined from the codebase — spec ambiguities, user-preference trade-offs, or constraints not visible in code. Aim for zero questions if the codebase patterns make all decisions clear.
 
 ### Phase 4: Recommendations
 

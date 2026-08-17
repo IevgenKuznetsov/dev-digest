@@ -244,8 +244,24 @@ Agent tool:
     Spec file: <spec_path>
     Target package: <target_package>
 
-    Read the spec carefully. Ask any clarifying questions you need before
-    producing the plan. Write the plan to:
+    Read the spec carefully. Before asking the user clarifying questions,
+    first try to resolve them by reading the codebase — CLAUDE.md, INSIGHTS.md,
+    and existing modules that use similar patterns. Only ask the user about
+    decisions that genuinely cannot be determined from the codebase.
+
+    In particular, resolve these common decisions from the codebase before asking:
+    - Module placement (new module vs. extend existing): check the existing
+      module list in server/src/modules/index.ts and look for onion-architecture
+      precedents. New modules are preferred when the feature has its own DB table,
+      LLM call, or distinct business logic.
+    - Concurrency strategy: check existing modules (e.g. onboarding) for the
+      in-memory lock pattern before asking the user.
+    - Multi-agent / parallel execution: propose yes for cross-package features
+      unless there is an ordering dependency that prevents it.
+    - Cache/persistence strategy: check existing module tables and JSONB patterns
+      before asking.
+
+    Write the plan to:
       <target_package>/specs/<feature_name>/<feature_name>_plan.md
 
     After writing the file, output: PLAN_COMPLETE: <file_path>
@@ -289,6 +305,15 @@ Agent tool:
     Label each entry's source: [AC] [EDGE] [NFR] [UNTRUSTED]
     This enumeration is your complete audit checklist — do not add or remove
     items during the audit phase.
+
+    **Documented substitution rule:**
+    If the plan's Recommendations section explicitly documents a deliberate
+    deviation from the spec's stated mechanism — with a rationale (e.g.,
+    "substituting an in-memory mutex for rate limiting because the mutex is
+    semantically correct for per-resource exclusivity") — treat that requirement
+    as COVERED, not PARTIAL. A documented and justified substitution is an
+    implementation decision, not a gap. Only mark as PARTIAL if the substitution
+    is undocumented or the rationale is absent.
 
     **Step 1 — Audit each requirement.**
     For every item in your Step 0 checklist, determine whether the plan covers it.
@@ -354,6 +379,9 @@ Handle choice:
 
 ### Case C — verdict NEEDS REVISION, all gaps are TARGETED (no STRUCTURAL gaps)
 
+Track internally: `targeted_edit_rounds` = number of targeted-edit passes completed so far.
+
+**If `targeted_edit_rounds` = 0** (first pass):
 > "The cross-review found gaps — all are targeted fixes (single values or missing clauses).
 > Options:
 > 1. **Targeted edit** *(recommended)* — I will apply the fixes directly to the plan with Edit tool, then re-run the review
@@ -361,8 +389,16 @@ Handle choice:
 > 3. **Accept as-is** — proceed with current plan, gaps noted for implementation
 > 4. **Manually fix** — edit the plan directly; tell me when done"
 
+**If `targeted_edit_rounds` ≥ 1** (same PARTIAL items survived a targeted-edit pass):
+> "The cross-review still shows N partial items after the targeted edit — these are
+> reviewer judgment calls rather than genuine plan gaps. Recommended: accept as-is.
+> Options:
+> 1. **Accept as-is** *(recommended)* — surviving partials are documented; proceed to final presentation
+> 2. **Targeted edit** — apply another round of edits and re-run the review
+> 3. **Manually fix** — edit the plan yourself; tell me when done"
+
 Handle choice:
-- **Targeted edit**: Apply Edit tool calls to the plan file for each gap → re-run cross-review.
+- **Targeted edit**: Increment `targeted_edit_rounds`. Apply Edit tool calls to the plan file for each gap → re-run cross-review.
 - **Re-run planner**: Feed cross-review output and gap list back to implementation-planner (Phase 4 style) → re-run Phase 5.
 - **Accept as-is**: Proceed to Final Presentation.
 - **Manually fix**: Wait for user confirmation, read the updated plan, re-run cross-review.
