@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, primaryKey } from 'drizzle-orm/pg-core';
 import { now } from './_shared';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
@@ -66,3 +66,20 @@ export const prBrief = pgTable('pr_brief', {
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
   json: jsonb('json').notNull(),
 });
+
+export const prRiskBrief = pgTable(
+  'pr_risk_brief',
+  {
+    prId: uuid('pr_id')
+      .notNull()
+      .references(() => pullRequests.id, { onDelete: 'cascade' }),
+    headSha: text('head_sha').notNull(),
+    brief: jsonb('brief').notNull(),
+    model: text('model').notNull(),
+    sources: jsonb('sources'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.prId, t.headSha] }),
+  }),
+);

@@ -9,7 +9,7 @@ import type {
   FindingKind,
   SmartDiff,
 } from '@devdigest/shared';
-import { buildSmartDiff } from './classifier.js';
+import { buildSmartDiff, enrichSmartDiffSummaries } from './classifier.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import * as t from '../../db/schema.js';
 import { NotFoundError, AppError } from '../../platform/errors.js';
@@ -392,8 +392,9 @@ export class PullsService {
   async getSmartDiff(workspaceId: string, prId: string): Promise<SmartDiff> {
     await this.resolvePrAndRepo(prId, workspaceId);
 
+    // Step 11: Also select `patch` for pseudocode_summary enrichment (AC-OF1).
     const files = await this.container.db
-      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions })
+      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions, patch: t.prFiles.patch })
       .from(t.prFiles)
       .where(eq(t.prFiles.prId, prId));
 
@@ -430,7 +431,20 @@ export class PullsService {
       }
     }
 
-    return buildSmartDiff(files, findingsByFile);
+    const smartDiff = buildSmartDiff(files, findingsByFile);
+
+    // Best-effort pseudocode summary enrichment (AC-OF1).
+    // Skip files with null patches (GAP-10). Failures degrade gracefully.
+    const patches = new Map<string, string>(
+      files.filter((f) => f.patch !== null).map((f) => [f.path, f.patch as string]),
+    );
+    try {
+      await enrichSmartDiffSummaries(smartDiff, patches, this.container, workspaceId);
+    } catch (err) {
+      this.log.warn({ err }, 'enrichSmartDiffSummaries failed — returning SmartDiff without summaries');
+    }
+
+    return smartDiff;
   }
 
   async getBlastForPr(workspaceId: string, prId: string) {

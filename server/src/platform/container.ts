@@ -27,6 +27,7 @@ import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import { ProjectContextService } from '../modules/project-context/service.js';
 import { OnboardingService } from '../modules/onboarding/service.js';
+import { RiskBriefService } from '../modules/risk-brief/service.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
@@ -82,6 +83,7 @@ export class Container {
   private _priceBook?: PriceBook;
   private _projectContext?: ProjectContextService;
   private _onboarding?: OnboardingService;
+  private _riskBrief?: RiskBriefService;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -109,6 +111,10 @@ export class Container {
 
   get onboarding(): OnboardingService {
     return (this._onboarding ??= new OnboardingService(this));
+  }
+
+  get riskBrief(): RiskBriefService {
+    return (this._riskBrief ??= new RiskBriefService(this));
   }
 
   get reviewRepo(): ReviewRepository {

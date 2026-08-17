@@ -31,3 +31,4 @@ export * from './contracts/findings-counts.js';
 export * from './adapters.js';
 export * from './contracts/blast-api.js';
 export * from './contracts/onboarding.js';
+export * from './contracts/brief-response.js';

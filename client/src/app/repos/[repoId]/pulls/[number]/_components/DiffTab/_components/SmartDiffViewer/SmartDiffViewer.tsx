@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Badge, SectionLabel, Icon, type IconName } from "@devdigest/ui";
+import { Info } from "lucide-react";
 import { FileCard } from "@/components/diff-viewer/FileCard";
 import type { DiffCommentApi } from "@/components/diff-viewer";
 import type { LineFinding } from "@/components/diff-viewer/CodeLine";
@@ -154,6 +155,13 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
                     fileFindings={findingRecordsByFile.get(smartFile.path)}
                     onFindingClick={onFindingClick}
                   />
+                  {/* AC-E11: Pseudocode summary annotation — plain text only (no HTML interpretation) */}
+                  {smartFile.pseudocode_summary != null && (
+                    <div style={s.pseudocodeSummary}>
+                      <Info size={13} style={s.pseudocodeIcon} />
+                      <span>{smartFile.pseudocode_summary}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}

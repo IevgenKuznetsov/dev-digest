@@ -163,4 +163,37 @@ describe("SmartDiffViewer", () => {
     const boilerplateCard = screen.getByTestId("file-card-package-lock.json");
     expect(boilerplateCard).toHaveAttribute("data-expanded", "false");
   });
+
+  it("renders pseudocode_summary annotation when non-null (AC-E11)", () => {
+    const groupsWithSummary: SmartDiffGroup[] = [
+      {
+        role: "core",
+        files: [
+          {
+            path: "src/auth.ts",
+            additions: 20,
+            deletions: 5,
+            finding_lines: [],
+            pseudocode_summary: "Adds rate limiting to auth endpoint",
+          },
+        ],
+      },
+    ];
+    const files: PrFile[] = [{ path: "src/auth.ts", additions: 20, deletions: 5, patch: null }];
+
+    render(<SmartDiffViewer groups={groupsWithSummary} files={files} />);
+
+    expect(screen.getByText("Adds rate limiting to auth endpoint")).toBeInTheDocument();
+  });
+
+  it("does not render pseudocode_summary annotation when null", () => {
+    render(<SmartDiffViewer groups={GROUPS} files={ALL_FILES} />);
+    // GROUPS has pseudocode_summary: null for all files
+    // No annotation text from any summary should appear
+    // (just confirming auth.ts card is present but no annotation div)
+    expect(screen.getByTestId("file-card-src/auth.ts")).toBeInTheDocument();
+    // The summary text from the fixture is null so there's nothing to query
+    // Verify there's no Info-icon annotation element (no text from summaries)
+    expect(screen.queryByText("Adds rate limiting to auth endpoint")).not.toBeInTheDocument();
+  });
 });

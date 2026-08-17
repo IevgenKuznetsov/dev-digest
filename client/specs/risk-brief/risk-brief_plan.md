@@ -7,8 +7,7 @@
 **Created:** 2026-08-17
 **Revised:** 2026-08-17 (cross-review gap closure)
 
-## Context
-
+## Contextye
 Reviewers currently see IntentCard and BlastCard on the PR Overview tab but must
 mentally synthesize risk across intent, blast, findings, and diff data. This feature
 adds a single AI-generated PrBriefCard that consolidates what changed, why, risk

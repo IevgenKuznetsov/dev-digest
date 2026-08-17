@@ -50,4 +50,25 @@ export const s = {
     flexDirection: "column" as const,
     gap: 4,
   } satisfies CSSProperties,
+
+  pseudocodeSummary: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 6,
+    padding: "6px 10px",
+    background: "var(--bg-hover)",
+    borderLeft: "2px solid var(--border)",
+    borderRadius: "0 4px 4px 0",
+    marginTop: 2,
+    marginBottom: 2,
+    fontSize: 12,
+    color: "var(--text-secondary)",
+    lineHeight: 1.5,
+  } satisfies CSSProperties,
+
+  pseudocodeIcon: {
+    flexShrink: 0,
+    marginTop: 2,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
 } as const;
