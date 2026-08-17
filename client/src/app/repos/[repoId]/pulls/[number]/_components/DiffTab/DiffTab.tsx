@@ -54,11 +54,13 @@ export function DiffTab({ prId, filesCount, files, canComment, onFindingClick }:
     [reviews],
   );
   // Map each file to its review_focus note from the risk brief — shown as "What this does" in Smart Diff.
+  // Keys are lowercased for case-insensitive lookup (GitHub and LLM paths may differ in case).
   const reviewNoteByFile = React.useMemo<Map<string, string>>(() => {
     const map = new Map<string, string>();
     if (!rawBrief || !("brief" in rawBrief)) return map;
     for (const item of rawBrief.brief.review_focus) {
-      if (!map.has(item.file)) map.set(item.file, item.note);
+      const key = item.file.toLowerCase();
+      if (!map.has(key)) map.set(key, item.note);
     }
     return map;
   }, [rawBrief]);
@@ -125,9 +127,9 @@ export function DiffTab({ prId, filesCount, files, canComment, onFindingClick }:
         Files changed · {filesCount} files
       </SectionLabel>
       {showGrouped ? (
-        <SmartDiffViewer groups={smartDiff!.groups} files={files} commenting={commenting} findings={allFindings} onFindingClick={onFindingClick} reviewNoteByFile={reviewNoteByFile} />
+        <SmartDiffViewer groups={smartDiff!.groups} files={files} prId={prId} commenting={commenting} findings={allFindings} onFindingClick={onFindingClick} />
       ) : (
-        <DiffViewer files={files} commenting={commenting} />
+        <DiffViewer files={files} commenting={commenting} reviewNoteByFile={reviewNoteByFile} />
       )}
     </section>
   );

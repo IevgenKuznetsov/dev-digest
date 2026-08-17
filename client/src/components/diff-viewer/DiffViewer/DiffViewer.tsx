@@ -14,9 +14,11 @@ import { FileCard } from "../FileCard";
 export function DiffViewer({
   files,
   commenting,
+  reviewNoteByFile,
 }: {
   files: PrFile[];
   commenting?: DiffCommentApi;
+  reviewNoteByFile?: Map<string, string>;
 }) {
   const t = useTranslations("shell");
   if (!files || files.length === 0) {
@@ -24,8 +26,13 @@ export function DiffViewer({
   }
   return (
     <div style={s.list}>
-      {files.map((f, i) => (
-        <FileCard key={f.path} file={f} commenting={commenting} />
+      {files.map((f) => (
+        <FileCard
+          key={f.path}
+          file={f}
+          commenting={commenting}
+          reviewNote={reviewNoteByFile?.get(f.path.toLowerCase())}
+        />
       ))}
     </div>
   );

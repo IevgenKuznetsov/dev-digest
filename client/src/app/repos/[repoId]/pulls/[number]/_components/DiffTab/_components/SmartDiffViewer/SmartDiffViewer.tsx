@@ -8,22 +8,35 @@ import type { DiffCommentApi } from "@/components/diff-viewer";
 import type { LineFinding } from "@/components/diff-viewer/CodeLine";
 import type { SmartDiffGroup, FindingRecord } from "@devdigest/shared";
 import type { PrFile } from "@devdigest/shared";
+import { useRiskBrief } from "@/lib/hooks/risk-brief";
 import { ROLE_ORDER, ROLE_LABELS, ROLE_ICONS, DEFAULT_COLLAPSED, FILE_DEFAULT_EXPANDED } from "./constants";
 import { s } from "./styles";
 
 interface SmartDiffViewerProps {
   groups: SmartDiffGroup[];
   files: PrFile[];
+  /** PR uuid — used to fetch the risk brief for "What this does" strips. */
+  prId?: string | null;
   commenting?: DiffCommentApi;
   /** All findings from the latest review — used to annotate lines with severity. */
   findings?: FindingRecord[];
   /** Callback when a finding badge is clicked — navigates to findings tab. */
   onFindingClick?: (findingId: string) => void;
-  /** Per-file review focus notes from the risk brief — shown as "What this does" strips below each file header. */
-  reviewNoteByFile?: Map<string, string>;
 }
 
-export function SmartDiffViewer({ groups, files, commenting, findings, onFindingClick, reviewNoteByFile }: SmartDiffViewerProps) {
+export function SmartDiffViewer({ groups, files, prId, commenting, findings, onFindingClick }: SmartDiffViewerProps) {
+  const { data: rawBrief } = useRiskBrief(prId);
+  // Build per-file note map from risk brief's review_focus section.
+  // Keys are lowercased for case-insensitive path matching.
+  const reviewNoteByFile = React.useMemo<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    if (!rawBrief || !("brief" in rawBrief)) return map;
+    for (const item of rawBrief.brief.review_focus) {
+      const key = item.file.toLowerCase();
+      if (!map.has(key)) map.set(key, item.note);
+    }
+    return map;
+  }, [rawBrief]);
   const [collapsed, setCollapsed] = React.useState(DEFAULT_COLLAPSED);
   const fileRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -157,7 +170,7 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
                     fileFindings={findingRecordsByFile.get(smartFile.path)}
                     onFindingClick={onFindingClick}
                     label="Smart order"
-                    reviewNote={reviewNoteByFile?.get(smartFile.path)}
+                    reviewNote={reviewNoteByFile?.get(smartFile.path.toLowerCase())}
                   />
                   {/* AC-E11: Pseudocode summary annotation — plain text only (no HTML interpretation) */}
                   {smartFile.pseudocode_summary != null && (
