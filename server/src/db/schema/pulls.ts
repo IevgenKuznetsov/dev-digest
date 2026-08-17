@@ -42,6 +42,9 @@ export const prFiles = pgTable('pr_files', {
   additions: integer('additions').notNull().default(0),
   deletions: integer('deletions').notNull().default(0),
   patch: text('patch'),
+  // Populated after a review run by enrichSmartDiffSummaries (best-effort).
+  // Null until the first review runs; cleared when pr_files are refreshed on sync.
+  pseudocodeSummary: text('pseudocode_summary'),
 });
 
 export const prCommits = pgTable('pr_commits', {

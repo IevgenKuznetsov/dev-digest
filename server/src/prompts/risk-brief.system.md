@@ -11,10 +11,10 @@ You MUST return a JSON object with exactly this structure:
 - `risks` (array): Up to 10 specific risk areas. Each must have:
   - `title` (string): Short risk title (< 60 chars)
   - `description` (string): Concise explanation of the risk (1-3 sentences)
-  - `file_refs` (array): File references that are relevant to this risk. Each ref must have `file` (exact path from the PR file list) and optionally `line` (integer)
+  - `file_refs` (array): File references that are relevant to this risk. Each ref must have `file` (exact path from the PR file list) and optionally `line` (integer line number pinpointed from the diff)
 - `review_focus` (array): Up to 15 prioritized review items, ordered from highest to lowest risk. Each must have:
   - `file` (exact path from the PR file list)
-  - `line` (integer, optional)
+  - `line` (integer, optional — see line number rule below)
   - `note` (string): What to look for in this file (1-2 sentences)
 
 ## Critical Rules
@@ -30,3 +30,4 @@ You MUST return a JSON object with exactly this structure:
 5. **Reviewer-oriented:** Write for someone who needs to decide where to start reviewing, not for the PR author. Be direct about what is risky and why.
 6. **Conservative assessment:** When uncertain, lean toward a higher risk level. False positives are cheaper than missed risks.
 7. **Best-effort:** If some context (intent, blast radius, linked issue) is missing, do your best with the available information. Do not refuse or fail — produce the best brief you can.
+8. **Line numbers:** Only set `line` when you can identify the exact new-file line from a diff hunk header (`@@ -old +new @@`) or a specific changed line in the patch. If you cannot pinpoint a line with confidence, **omit `line` entirely**. Never default to 1.

@@ -19,9 +19,11 @@ interface SmartDiffViewerProps {
   findings?: FindingRecord[];
   /** Callback when a finding badge is clicked — navigates to findings tab. */
   onFindingClick?: (findingId: string) => void;
+  /** Per-file review focus notes from the risk brief — shown as "What this does" strips below each file header. */
+  reviewNoteByFile?: Map<string, string>;
 }
 
-export function SmartDiffViewer({ groups, files, commenting, findings, onFindingClick }: SmartDiffViewerProps) {
+export function SmartDiffViewer({ groups, files, commenting, findings, onFindingClick, reviewNoteByFile }: SmartDiffViewerProps) {
   const [collapsed, setCollapsed] = React.useState(DEFAULT_COLLAPSED);
   const fileRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -154,6 +156,8 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
                     findingsMap={findingsByFile.get(smartFile.path)}
                     fileFindings={findingRecordsByFile.get(smartFile.path)}
                     onFindingClick={onFindingClick}
+                    label="Smart order"
+                    reviewNote={reviewNoteByFile?.get(smartFile.path)}
                   />
                   {/* AC-E11: Pseudocode summary annotation — plain text only (no HTML interpretation) */}
                   {smartFile.pseudocode_summary != null && (

@@ -118,11 +118,12 @@ export class RiskBriefService {
   ): Promise<RiskBriefResponse> {
     const startMs = Date.now();
 
-    // 1. Fetch PR file paths — zero-files guard (EC-7/GAP-1).
-    const prFilePaths = await this.repo.getPrFilePaths(prId);
-    if (prFilePaths.length === 0) {
+    // 1. Fetch PR files (path + patch) — zero-files guard (EC-7/GAP-1).
+    const prFiles = await this.repo.getPrFiles(prId);
+    if (prFiles.length === 0) {
       throw new AppError('no_files', 'PR has no files to analyze', 422);
     }
+    const prFilePaths = prFiles.map((f) => f.path);
 
     // Build normalized PR file set for O(1) validation.
     const normalizedPrFileSet = new Set(prFilePaths.map(normalizePath));
@@ -199,9 +200,19 @@ export class RiskBriefService {
       `## PR Diff Stats\n- Additions: ${prRow.additions}\n- Deletions: ${prRow.deletions}\n- Files changed: ${prRow.filesCount}`,
     );
 
-    userParts.push(
-      `## PR Files\n${wrapUntrusted('pr-files', prFilePaths.join('\n'))}`,
-    );
+    // Include patch content so the LLM can identify specific line numbers from
+    // diff hunk headers (@@ -L,N +L,N @@). Cap total patch chars to keep the
+    // prompt manageable; files that exceed the remaining budget fall back to
+    // path-only so the file is still present for validation purposes.
+    const PATCH_BUDGET_CHARS = 30_000;
+    let remainingBudget = PATCH_BUDGET_CHARS;
+    const filesSection = prFiles.map((f) => {
+      if (!f.patch || remainingBudget <= 0) return f.path;
+      const chunk = f.patch.slice(0, remainingBudget);
+      remainingBudget -= chunk.length;
+      return `### ${f.path}\n\`\`\`diff\n${chunk}\n\`\`\``;
+    }).join('\n\n');
+    userParts.push(`## PR Files\n${wrapUntrusted('pr-files', filesSection)}`);
 
     if (intentRow) {
       const intentText = [

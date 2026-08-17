@@ -9,7 +9,7 @@ import type {
   FindingKind,
   SmartDiff,
 } from '@devdigest/shared';
-import { buildSmartDiff, enrichSmartDiffSummaries } from './classifier.js';
+import { buildSmartDiff } from './classifier.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import * as t from '../../db/schema.js';
 import { NotFoundError, AppError } from '../../platform/errors.js';
@@ -392,9 +392,8 @@ export class PullsService {
   async getSmartDiff(workspaceId: string, prId: string): Promise<SmartDiff> {
     await this.resolvePrAndRepo(prId, workspaceId);
 
-    // Step 11: Also select `patch` for pseudocode_summary enrichment (AC-OF1).
     const files = await this.container.db
-      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions, patch: t.prFiles.patch })
+      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions, pseudocodeSummary: t.prFiles.pseudocodeSummary })
       .from(t.prFiles)
       .where(eq(t.prFiles.prId, prId));
 
@@ -433,15 +432,22 @@ export class PullsService {
 
     const smartDiff = buildSmartDiff(files, findingsByFile);
 
-    // Best-effort pseudocode summary enrichment (AC-OF1).
-    // Skip files with null patches (GAP-10). Failures degrade gracefully.
-    const patches = new Map<string, string>(
-      files.filter((f) => f.patch !== null).map((f) => [f.path, f.patch as string]),
+    // Apply persisted pseudocode_summary values from DB (populated post-review).
+    // No LLM call here — getSmartDiff is O(DB).
+    const summaryByPath = new Map(
+      files
+        .filter((f) => f.pseudocodeSummary !== null)
+        .map((f) => [f.path, f.pseudocodeSummary as string]),
     );
-    try {
-      await enrichSmartDiffSummaries(smartDiff, patches, this.container, workspaceId);
-    } catch (err) {
-      this.log.warn({ err }, 'enrichSmartDiffSummaries failed — returning SmartDiff without summaries');
+    if (summaryByPath.size > 0) {
+      for (const group of smartDiff.groups) {
+        for (const file of group.files) {
+          const summary = summaryByPath.get(file.path);
+          if (summary !== undefined) {
+            (file as { pseudocode_summary: string | null }).pseudocode_summary = summary;
+          }
+        }
+      }
     }
 
     return smartDiff;

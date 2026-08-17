@@ -39,6 +39,8 @@ export function FileCard({
   findingsMap,
   fileFindings,
   onFindingClick,
+  label,
+  reviewNote,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
@@ -51,6 +53,10 @@ export function FileCard({
   fileFindings?: FindingRecord[];
   /** Callback when a finding badge/annotation is clicked — navigates to findings tab. */
   onFindingClick?: (findingId: string) => void;
+  /** Optional label shown in the file header (e.g. "Smart order"). */
+  label?: string;
+  /** Review focus note from the risk brief — shown as a "What this does" strip below the header. */
+  reviewNote?: string;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -104,6 +110,11 @@ export function FileCard({
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
         </span>
+        {label && (
+          <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 500, marginLeft: 4, flexShrink: 0 }}>
+            {label}
+          </span>
+        )}
         {fileFindings && fileFindings.length > 0 && (() => {
           const bySev: Record<string, FindingRecord[]> = {};
           for (const f of fileFindings) {
@@ -159,6 +170,12 @@ export function FileCard({
           </span>
         )}
       </div>
+      {reviewNote && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "5px 12px", borderTop: "1px solid var(--border)", background: "var(--bg-elevated)", fontSize: 12 }}>
+          <span style={{ fontWeight: 600, color: "var(--text-muted)", whiteSpace: "nowrap", flexShrink: 0 }}>What this does:</span>
+          <span style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{reviewNote}</span>
+        </div>
+      )}
       {open && (
         <div style={s.fileBody}>
           {lines.length === 0 ? (

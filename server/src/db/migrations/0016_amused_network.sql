@@ -1,0 +1,1 @@
+ALTER TABLE "pr_files" ADD COLUMN "pseudocode_summary" text;

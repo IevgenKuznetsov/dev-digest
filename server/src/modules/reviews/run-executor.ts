@@ -9,6 +9,7 @@ import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import { classifyIntent } from './intent-service.js';
+import { buildSmartDiff, enrichSmartDiffSummaries } from '../pulls/classifier.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -144,6 +145,40 @@ export class ReviewRunExecutor {
         );
       }
     }
+
+    // Best-effort: populate pseudocode_summary on pr_files after all agents
+    // finish. Fire-and-forget — never delays the review response to the client.
+    void (async () => {
+      try {
+        const prFileRows = await this.repo.getPrFiles(pull.id);
+        const patches = new Map<string, string>(
+          prFileRows.filter((f) => f.patch !== null).map((f) => [f.path, f.patch as string]),
+        );
+        if (patches.size === 0) return;
+
+        const smartDiff = buildSmartDiff(prFileRows, new Map());
+        await enrichSmartDiffSummaries(smartDiff, patches, this.container, workspaceId);
+
+        const summaries = new Map<string, string>();
+        for (const group of smartDiff.groups) {
+          for (const file of group.files) {
+            if (file.pseudocode_summary) summaries.set(file.path, file.pseudocode_summary);
+          }
+        }
+        if (summaries.size > 0) {
+          await this.repo.savePseudocodeSummaries(pull.id, summaries);
+          logger?.info(
+            { prId: pull.id, count: summaries.size },
+            'review: pseudocode summaries persisted',
+          );
+        }
+      } catch (err) {
+        logger?.warn(
+          { err: (err as Error).message, prId: pull.id },
+          'review: pseudocode_summary enrichment failed (best-effort)',
+        );
+      }
+    })();
   }
 
   /** Execute a single agent's review against a PR, streaming progress. */

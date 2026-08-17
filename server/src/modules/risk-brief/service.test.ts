@@ -56,6 +56,7 @@ function makeRepoMock(opts: {
   briefRow?: object | null;
   intent?: object | null;
   blastSummary?: string | null;
+  patches?: (string | null)[];
 }) {
   return {
     getPrForWorkspace: vi.fn().mockResolvedValue(
@@ -73,7 +74,12 @@ function makeRepoMock(opts: {
             repoName: 'myrepo',
           },
     ),
-    getPrFilePaths: vi.fn().mockResolvedValue(opts.filePaths ?? ['src/auth.ts', 'src/middleware.ts']),
+    getPrFiles: vi.fn().mockResolvedValue(
+      (opts.filePaths ?? ['src/auth.ts', 'src/middleware.ts']).map((path, i) => ({
+        path,
+        patch: opts.patches?.[i] ?? null,
+      })),
+    ),
     getLatestByPrId: vi.fn().mockResolvedValue(opts.briefRow ?? null),
     getByPrIdAndSha: vi.fn().mockResolvedValue(opts.briefRow ?? null),
     getIntentForPr: vi.fn().mockResolvedValue(opts.intent ?? null),

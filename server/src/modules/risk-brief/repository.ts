@@ -134,15 +134,15 @@ export class RiskBriefRepository {
   }
 
   /**
-   * Get all file paths for a PR.
+   * Get all files for a PR including their patch content.
    * Returns empty array if PR has no files.
    */
-  async getPrFilePaths(prId: string): Promise<string[]> {
+  async getPrFiles(prId: string): Promise<{ path: string; patch: string | null }[]> {
     const rows = await this.db
-      .select({ path: t.prFiles.path })
+      .select({ path: t.prFiles.path, patch: t.prFiles.patch })
       .from(t.prFiles)
       .where(eq(t.prFiles.prId, prId));
-    return rows.map((r) => r.path);
+    return rows.map((r) => ({ path: r.path, patch: r.patch }));
   }
 
   /**
