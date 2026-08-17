@@ -393,7 +393,7 @@ export class PullsService {
     await this.resolvePrAndRepo(prId, workspaceId);
 
     const files = await this.container.db
-      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions })
+      .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions, pseudocodeSummary: t.prFiles.pseudocodeSummary })
       .from(t.prFiles)
       .where(eq(t.prFiles.prId, prId));
 
@@ -430,7 +430,27 @@ export class PullsService {
       }
     }
 
-    return buildSmartDiff(files, findingsByFile);
+    const smartDiff = buildSmartDiff(files, findingsByFile);
+
+    // Apply persisted pseudocode_summary values from DB (populated post-review).
+    // No LLM call here — getSmartDiff is O(DB).
+    const summaryByPath = new Map(
+      files
+        .filter((f) => f.pseudocodeSummary !== null)
+        .map((f) => [f.path, f.pseudocodeSummary as string]),
+    );
+    if (summaryByPath.size > 0) {
+      for (const group of smartDiff.groups) {
+        for (const file of group.files) {
+          const summary = summaryByPath.get(file.path);
+          if (summary !== undefined) {
+            (file as { pseudocode_summary: string | null }).pseudocode_summary = summary;
+          }
+        }
+      }
+    }
+
+    return smartDiff;
   }
 
   async getBlastForPr(workspaceId: string, prId: string) {

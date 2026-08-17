@@ -66,13 +66,25 @@ For each item in the numbered list:
    - **PARTIAL** — partially implemented. State what's done and what's missing.
    - **UNVERIFIABLE** — cannot determine from code alone (e.g., "runs correctly in production"). State what you tried.
 
-### Phase 3: Cross-Check
+### Phase 3: Spec Coverage Re-check
+
+If the plan contains a **Spec Coverage Matrix** section:
+
+1. Read the original `.spec.md` file (path is in the plan's **Spec** field).
+2. Extract every EARS acceptance criterion from the spec.
+3. Verify each criterion appears in the coverage matrix with status COVERED and at least one plan step.
+4. For each COVERED criterion, verify the referenced plan step's implementation was actually completed (cross-reference with Phase 2 results).
+5. Report any criterion that is missing from the matrix or marked COVERED but whose step FAILED.
+
+If the plan does NOT contain a Spec Coverage Matrix, mark this section as FAIL with note: "Plan was produced without the Plan-Completeness Gate."
+
+### Phase 4: Cross-Check
 
 1. **Scope creep** — use `git diff` (if range provided) to check for files changed that are NOT in the plan. List them.
 2. **Missing items** — any plan requirements with no matching implementation.
 3. **Out-of-scope violations** — anything the plan explicitly excluded but was touched anyway.
 
-### Phase 4: Report
+### Phase 5: Report
 
 Produce the structured report below.
 
@@ -120,6 +132,13 @@ Produce the structured report below.
 
 [Same structure — every sub-point gets its own row]
 
+## Spec Coverage Re-check
+
+| Criterion | Matrix Status | Implementation | Evidence |
+|-----------|--------------|----------------|----------|
+| AC-1: [text] | COVERED | PASS/FAIL | Step N — `file:line` |
+| AC-2: [text] | MISSING | FAIL | Not in coverage matrix |
+
 ## Architecture Constraints
 
 | Constraint | Status | Evidence |
@@ -141,6 +160,7 @@ Produce the structured report below.
 |----------|-------|------|------|---------|--------------|
 | Pre-implementation | X | X | X | X | X |
 | Step requirements | X | X | X | X | X |
+| Spec coverage | X | X | X | X | X |
 | Architecture | X | X | X | X | X |
 | **Total** | **X** | **X** | **X** | **X** | **X** |
 ```

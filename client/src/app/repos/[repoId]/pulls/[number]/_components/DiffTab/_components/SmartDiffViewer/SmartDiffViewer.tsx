@@ -2,17 +2,21 @@
 
 import React from "react";
 import { Badge, SectionLabel, Icon, type IconName } from "@devdigest/ui";
+import { Info } from "lucide-react";
 import { FileCard } from "@/components/diff-viewer/FileCard";
 import type { DiffCommentApi } from "@/components/diff-viewer";
 import type { LineFinding } from "@/components/diff-viewer/CodeLine";
 import type { SmartDiffGroup, FindingRecord } from "@devdigest/shared";
 import type { PrFile } from "@devdigest/shared";
+import { useRiskBrief } from "@/lib/hooks/risk-brief";
 import { ROLE_ORDER, ROLE_LABELS, ROLE_ICONS, DEFAULT_COLLAPSED, FILE_DEFAULT_EXPANDED } from "./constants";
 import { s } from "./styles";
 
 interface SmartDiffViewerProps {
   groups: SmartDiffGroup[];
   files: PrFile[];
+  /** PR uuid — used to fetch the risk brief for "What this does" strips. */
+  prId?: string | null;
   commenting?: DiffCommentApi;
   /** All findings from the latest review — used to annotate lines with severity. */
   findings?: FindingRecord[];
@@ -20,7 +24,19 @@ interface SmartDiffViewerProps {
   onFindingClick?: (findingId: string) => void;
 }
 
-export function SmartDiffViewer({ groups, files, commenting, findings, onFindingClick }: SmartDiffViewerProps) {
+export function SmartDiffViewer({ groups, files, prId, commenting, findings, onFindingClick }: SmartDiffViewerProps) {
+  const { data: rawBrief } = useRiskBrief(prId);
+  // Build per-file note map from risk brief's review_focus section.
+  // Keys are lowercased for case-insensitive path matching.
+  const reviewNoteByFile = React.useMemo<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    if (!rawBrief || !("brief" in rawBrief)) return map;
+    for (const item of rawBrief.brief.review_focus) {
+      const key = item.file.toLowerCase();
+      if (!map.has(key)) map.set(key, item.note);
+    }
+    return map;
+  }, [rawBrief]);
   const [collapsed, setCollapsed] = React.useState(DEFAULT_COLLAPSED);
   const fileRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -153,7 +169,16 @@ export function SmartDiffViewer({ groups, files, commenting, findings, onFinding
                     findingsMap={findingsByFile.get(smartFile.path)}
                     fileFindings={findingRecordsByFile.get(smartFile.path)}
                     onFindingClick={onFindingClick}
+                    label="Smart order"
+                    reviewNote={reviewNoteByFile?.get(smartFile.path.toLowerCase())}
                   />
+                  {/* AC-E11: Pseudocode summary annotation — plain text only (no HTML interpretation) */}
+                  {smartFile.pseudocode_summary != null && (
+                    <div style={s.pseudocodeSummary}>
+                      <Info size={13} style={s.pseudocodeIcon} />
+                      <span>{smartFile.pseudocode_summary}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}

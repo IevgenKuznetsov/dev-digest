@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { classifyFile, buildSmartDiff, TOO_BIG_THRESHOLD } from './classifier.js';
+import { describe, it, expect, vi } from 'vitest';
+import { classifyFile, buildSmartDiff, enrichSmartDiffSummaries, TOO_BIG_THRESHOLD } from './classifier.js';
 
 // ---- classifyFile -----------------------------------------------------------
 
@@ -270,5 +270,154 @@ describe('buildSmartDiff', () => {
   it('returns proposed_splits as empty array', () => {
     const result = buildSmartDiff(files, new Map());
     expect(result.split_suggestion.proposed_splits).toEqual([]);
+  });
+});
+
+// ---- enrichSmartDiffSummaries -----------------------------------------------
+
+describe('enrichSmartDiffSummaries', () => {
+  function makeContainer(summaries: Array<{ file: string; summary: string }>) {
+    const mockCompleteStructured = vi.fn().mockResolvedValue({
+      data: { summaries },
+    });
+    const mockLlm = { completeStructured: mockCompleteStructured };
+
+    return {
+      llm: vi.fn().mockResolvedValue(mockLlm),
+      db: {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      },
+      config: {},
+    } as unknown as import('../../platform/container.js').Container;
+  }
+
+  it('merges LLM summaries into core files by file path', async () => {
+    const smartDiff = buildSmartDiff(
+      [
+        { path: 'src/auth.ts', additions: 10, deletions: 2 },
+        { path: 'src/utils.ts', additions: 5, deletions: 1 },
+      ],
+      new Map(),
+    );
+
+    const patches = new Map([
+      ['src/auth.ts', '@@ -1,3 +1,5 @@\n+import rateLimit from "express-rate-limit";\n'],
+      ['src/utils.ts', '@@ -1,2 +1,4 @@\n+export function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }'],
+    ]);
+
+    const container = makeContainer([
+      { file: 'src/auth.ts', summary: 'Adds rate limiting middleware to auth endpoint' },
+      { file: 'src/utils.ts', summary: 'Adds a clamp utility function' },
+    ]);
+
+    await enrichSmartDiffSummaries(smartDiff, patches, container, 'ws-1');
+
+    const coreGroup = smartDiff.groups.find((g) => g.role === 'core')!;
+    const authFile = coreGroup.files.find((f) => f.path === 'src/auth.ts')!;
+    const utilsFile = coreGroup.files.find((f) => f.path === 'src/utils.ts')!;
+
+    expect(authFile.pseudocode_summary).toBe('Adds rate limiting middleware to auth endpoint');
+    expect(utilsFile.pseudocode_summary).toBe('Adds a clamp utility function');
+  });
+
+  it('leaves pseudocode_summary null for files not returned by LLM', async () => {
+    const smartDiff = buildSmartDiff(
+      [
+        { path: 'src/auth.ts', additions: 10, deletions: 2 },
+        { path: 'src/other.ts', additions: 3, deletions: 0 },
+      ],
+      new Map(),
+    );
+
+    const patches = new Map([
+      ['src/auth.ts', '@@ patch content @@'],
+      ['src/other.ts', '@@ other patch @@'],
+    ]);
+
+    // LLM only returns summary for auth.ts — other.ts is omitted.
+    const container = makeContainer([
+      { file: 'src/auth.ts', summary: 'Adds rate limiting' },
+    ]);
+
+    await enrichSmartDiffSummaries(smartDiff, patches, container, 'ws-1');
+
+    const coreGroup = smartDiff.groups.find((g) => g.role === 'core')!;
+    const otherFile = coreGroup.files.find((f) => f.path === 'src/other.ts')!;
+    expect(otherFile.pseudocode_summary).toBeNull();
+  });
+
+  it('skips boilerplate files and does not include them in the LLM call', async () => {
+    const smartDiff = buildSmartDiff(
+      [
+        { path: 'src/auth.ts', additions: 10, deletions: 2 },
+        { path: 'package-lock.json', additions: 200, deletions: 100 },
+      ],
+      new Map(),
+    );
+
+    const patches = new Map([
+      ['src/auth.ts', '@@ patch content @@'],
+      ['package-lock.json', '@@ lockfile patch @@'],
+    ]);
+
+    const mockCompleteStructured = vi.fn().mockResolvedValue({
+      data: { summaries: [{ file: 'src/auth.ts', summary: 'Adds rate limiting' }] },
+    });
+    const mockLlm = { completeStructured: mockCompleteStructured };
+    const container = {
+      llm: vi.fn().mockResolvedValue(mockLlm),
+      db: {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      },
+      config: {},
+    } as unknown as import('../../platform/container.js').Container;
+
+    await enrichSmartDiffSummaries(smartDiff, patches, container, 'ws-1');
+
+    // The user message sent to the LLM should NOT mention package-lock.json.
+    const callArgs = mockCompleteStructured.mock.calls[0]![0] as { messages: Array<{ content: string }> };
+    const userMsg = callArgs.messages[1]!.content;
+    expect(userMsg).not.toContain('package-lock.json');
+
+    // Boilerplate file has no summary.
+    const boilerplateGroup = smartDiff.groups.find((g) => g.role === 'boilerplate')!;
+    const lockFile = boilerplateGroup.files.find((f) => f.path === 'package-lock.json')!;
+    expect(lockFile.pseudocode_summary).toBeNull();
+  });
+
+  it('does nothing and skips LLM call when no files have patches', async () => {
+    const smartDiff = buildSmartDiff(
+      [{ path: 'src/auth.ts', additions: 10, deletions: 2 }],
+      new Map(),
+    );
+
+    // No patches provided.
+    const patches = new Map<string, string>();
+
+    const mockCompleteStructured = vi.fn();
+    const container = {
+      llm: vi.fn().mockResolvedValue({ completeStructured: mockCompleteStructured }),
+      db: {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      },
+      config: {},
+    } as unknown as import('../../platform/container.js').Container;
+
+    await enrichSmartDiffSummaries(smartDiff, patches, container, 'ws-1');
+
+    // LLM should not be called at all.
+    expect(mockCompleteStructured).not.toHaveBeenCalled();
   });
 });

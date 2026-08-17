@@ -122,5 +122,7 @@ export const onboarding = pgTable('onboarding', {
     .primaryKey()
     .references(() => repos.id, { onDelete: 'cascade' }),
   json: jsonb('json').notNull(),
+  model: text('model').notNull().default('deepseek/deepseek-v4-flash'),
+  inputSha: text('input_sha'),
   generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
 });

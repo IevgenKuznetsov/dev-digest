@@ -23,10 +23,11 @@ import { ImportDrawer } from "../ImportDrawer";
 import { ImportFromUrlDrawer } from "../ImportFromUrlDrawer";
 import { CommunitySearchDrawer } from "../CommunitySearchDrawer";
 import { CreateFromScratchDrawer } from "../CreateFromScratchDrawer";
+import { SkillContextSection } from "../SkillContextSection";
 import { s } from "./styles";
 
 const SKILL_TYPES: SkillType[] = ["rubric", "convention", "security", "custom"];
-const TABS = ["config", "preview", "evals", "stats", "versions"] as const;
+const TABS = ["config", "preview", "evals", "stats", "versions", "context"] as const;
 type Tab = (typeof TABS)[number];
 
 export function SkillsListView() {
@@ -197,6 +198,11 @@ function SkillDetail({
       {tab === "evals" && <EvalsTab skill={skill} />}
       {tab === "stats" && <StatsTab skill={skill} />}
       {tab === "versions" && <VersionsTab skill={skill} />}
+      {tab === "context" && (
+        <div style={s.configPanel}>
+          <SkillContextSection skillId={skill.id} />
+        </div>
+      )}
     </div>
   );
 }

@@ -25,6 +25,9 @@ import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
+import { ProjectContextService } from '../modules/project-context/service.js';
+import { OnboardingService } from '../modules/onboarding/service.js';
+import { RiskBriefService } from '../modules/risk-brief/service.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
@@ -51,6 +54,8 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** project-context service — tests can inject a pre-built instance. */
+  projectContext?: ProjectContextService;
 }
 
 export class Container {
@@ -76,6 +81,9 @@ export class Container {
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _projectContext?: ProjectContextService;
+  private _onboarding?: OnboardingService;
+  private _riskBrief?: RiskBriefService;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -94,6 +102,19 @@ export class Container {
 
   get agentsRepo(): AgentsRepository {
     return (this._agentsRepo ??= new AgentsRepository(this.db));
+  }
+
+  get projectContext(): ProjectContextService {
+    if (this.overrides.projectContext) return this.overrides.projectContext;
+    return (this._projectContext ??= new ProjectContextService(this));
+  }
+
+  get onboarding(): OnboardingService {
+    return (this._onboarding ??= new OnboardingService(this));
+  }
+
+  get riskBrief(): RiskBriefService {
+    return (this._riskBrief ??= new RiskBriefService(this));
   }
 
   get reviewRepo(): ReviewRepository {

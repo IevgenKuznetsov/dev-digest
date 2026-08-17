@@ -1,13 +1,22 @@
 /**
- * Smart Diff classifier — deterministic file-role assignment.
- * Pure domain logic: zero external dependencies (no DB, no Fastify, no adapters).
+ * Smart Diff classifier — deterministic file-role assignment (buildSmartDiff, classifyFile)
+ * plus an LLM enrichment step (enrichSmartDiffSummaries) with infrastructure dependencies.
  *
  * Roles:
  *   core       — business-logic files reviewers should focus on
  *   wiring     — config, CI, index barrels, migrations, manifests
  *   boilerplate — lock files, dist output, snapshots, generated code, source maps
+ *
+ * Also exports `enrichSmartDiffSummaries` — a best-effort LLM enrichment step
+ * that populates `pseudocode_summary` for core + wiring files. This function
+ * has external dependencies (container/LLM) and is intentionally kept separate
+ * from the pure `buildSmartDiff` function so it can be called from the service layer.
  */
+import { z } from 'zod';
 import type { SmartDiff, SmartDiffFile, SmartDiffGroup, SmartDiffRole } from '@devdigest/shared';
+import type { Container } from '../../platform/container.js';
+import { resolveFeatureModel } from '../settings/feature-models.js';
+import { wrapUntrusted } from '@devdigest/reviewer-core';
 
 // ---- Pattern registry (exported for testability and future tuning) ----------
 
@@ -206,4 +215,104 @@ export function buildSmartDiff(
       proposed_splits: [],
     },
   };
+}
+
+// ---- enrichSmartDiffSummaries -----------------------------------------------
+
+/** Max patch characters per file sent to the LLM to keep the request size bounded. */
+const MAX_PATCH_CHARS = 3_000;
+
+/** LLM response schema for batch pseudocode summaries. */
+const SummariesSchema = z.object({
+  summaries: z.array(
+    z.object({
+      file: z.string(),
+      summary: z.string(),
+    }),
+  ),
+});
+
+/**
+ * Enrich a `SmartDiff` with LLM-generated `pseudocode_summary` values for
+ * core and wiring files that have patch data available.
+ *
+ * Design:
+ *   - Single batched LLM call (not per-file) for cost and latency efficiency.
+ *   - Best-effort: files whose patch is null keep `pseudocode_summary: null`.
+ *   - Caller must wrap this in try-catch — errors are not swallowed here.
+ *   - Boilerplate files are skipped (they don't benefit from AI annotation).
+ *
+ * Uses `wrapUntrusted` per security policy (GAP-11/ASI01): patch content is
+ * attacker-influenced (PR author controls the diff). The LLM prompt uses it
+ * only for summarization and the output is stored as plain text, not executed.
+ */
+export async function enrichSmartDiffSummaries(
+  smartDiff: SmartDiff,
+  patches: Map<string, string>,
+  container: Container,
+  workspaceId: string,
+): Promise<void> {
+  // Collect core + wiring files that have patches (skip boilerplate — no value).
+  const filesToSummarize: Array<{ path: string; patch: string }> = [];
+
+  for (const group of smartDiff.groups) {
+    if (group.role === 'boilerplate') continue;
+    for (const file of group.files) {
+      const patch = patches.get(file.path);
+      if (patch) {
+        filesToSummarize.push({
+          path: file.path,
+          patch: patch.slice(0, MAX_PATCH_CHARS),
+        });
+      }
+    }
+  }
+
+  if (filesToSummarize.length === 0) return;
+
+  // Resolve model — reuses the risk_brief feature model for consistency.
+  const { provider, model } = await resolveFeatureModel(container, workspaceId, 'risk_brief');
+  const llm = await container.llm(provider);
+
+  const userMessage = [
+    'For each file below, write a single-sentence plain-English summary of what the changed code does.',
+    'Return ONLY the JSON structure — no other text.\n',
+    ...filesToSummarize.map(
+      ({ path, patch }) =>
+        `### ${path}\n${wrapUntrusted(`patch-${path}`, patch)}`,
+    ),
+  ].join('\n\n');
+
+  const result = await llm.completeStructured<z.infer<typeof SummariesSchema>>({
+    schema: SummariesSchema,
+    schemaName: 'SmartDiffSummaries',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a code reviewer. Given unified diff patches, produce concise plain-English one-sentence summaries of what each changed file does. Use only what the diff shows — do not invent functionality.',
+      },
+      { role: 'user', content: userMessage },
+    ],
+    model,
+    temperature: 0.2,
+    maxTokens: 2048,
+    maxRetries: 0,
+    timeoutMs: 30_000,
+  });
+
+  // Build a lookup map of file path → summary from the LLM response.
+  const summaryMap = new Map<string, string>(
+    result.data.summaries.map((s) => [s.file, s.summary]),
+  );
+
+  // Merge summaries back into SmartDiff in-place.
+  for (const group of smartDiff.groups) {
+    for (const file of group.files) {
+      const summary = summaryMap.get(file.path);
+      if (summary !== undefined) {
+        (file as { pseudocode_summary: string | null }).pseudocode_summary = summary;
+      }
+    }
+  }
 }

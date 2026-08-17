@@ -14,6 +14,7 @@
  * stable — feature agents EXTEND with new files, they do not edit existing ones.
  */
 
+export * from './contracts/context-doc.js';
 export * from './contracts/findings.js';
 export * from './contracts/intent.js';
 export * from './contracts/review-api.js';
@@ -29,3 +30,5 @@ export * from './contracts/run-cost.js';
 export * from './contracts/findings-counts.js';
 export * from './adapters.js';
 export * from './contracts/blast-api.js';
+export * from './contracts/onboarding.js';
+export * from './contracts/brief-response.js';

@@ -1,18 +1,47 @@
 # Agent Map
 
-Nine specialized agents: a core **research → plan → implement** pipeline plus quality, orchestration, and support agents.
+Ten specialized agents: a core **spec → plan → implement** pipeline plus quality, orchestration, and support agents.
 
 | Agent | Model | Effort | Purpose |
 |-------|-------|--------|---------|
+| [spec-creator](#spec-creator) | opus | high | Analyze feature prompts, ask questions, produce `.spec.md` files with EARS criteria |
 | [researcher](#researcher) | sonnet | medium | Find and synthesize information from repo and web |
-| [planner](#planner) | opus | high | Design implementation plans → `docs/<Feature>_plan.md` |
-| [brainstorm](#brainstorm) | sonnet | medium | Spawn N planners in parallel, compare approaches with pros/cons |
-| [implementor](#implementor) | sonnet | medium | Execute `.spec.md` plans step by step |
+| [implementation-planner](#implementation-planner) | opus | high | Take spec files, ask questions, propose improvements, produce `<feature>_plan.md` |
+| [brainstorm](#brainstorm) | sonnet | medium | Spawn N implementation-planners in parallel, compare approaches with pros/cons |
+| [implementor](#implementor) | sonnet | medium | Execute plans step by step |
 | [test-writer](#test-writer) | sonnet | medium | Write unit and integration tests |
-| [architecture-reviewer](#architecture-reviewer) | sonnet | medium | READ-ONLY check of architecture boundaries per module |
+| [architecture-reviewer](#architecture-reviewer) | sonnet | medium | READ-ONLY check of architecture boundaries for branch-affected modules only |
 | [security-reviewer](#security-reviewer) | sonnet | medium | READ-ONLY security scan of branch diff with severity report |
 | [plan-verifier](#plan-verifier) | sonnet | medium | READ-ONLY point-by-point verification of plan vs implementation |
 | [doc-writer](#doc-writer) | sonnet | medium | Write documentation with Mermaid diagrams |
+
+---
+
+## spec-creator
+
+**Purpose:** Analyzes feature prompts, asks multi-round clarifying questions, discovers edge cases and missing design elements, and produces structured `.spec.md` files using EARS requirement patterns.
+
+**Responsibilities:**
+- Lightweight codebase scan (CLAUDE.md files, module index, contracts, DB schema)
+- Multi-round Q&A (minimum 2 rounds) to clarify scope, edge cases, and non-functional requirements
+- Auto-detecting which package(s) a feature affects
+- Auto-detecting spec iteration numbers by scanning existing specs
+- Producing specs with EARS acceptance criteria, edge case tables, and untrusted input analysis
+- Deciding whether to write one combined spec or separate specs per package
+
+**Permissions:** Read + Write (restricted to `<package>/specs/<feature-name>/<feature-name>.spec.md` only).
+
+| Tools | Why |
+|-------|-----|
+| Read, Grep, Glob | Lightweight codebase scan (CLAUDE.md, module index, contracts, schemas, existing specs) |
+| Bash | Git log for recent changes |
+| Write | Save spec to `<package>/specs/<feature-name>/<feature-name>.spec.md` — the only allowed file |
+| AskUserQuestion | Multi-round Q&A (minimum 2 rounds before writing) |
+| TaskCreate, TaskUpdate | Track progress |
+
+**Input:** Feature prompt describing what to build.
+
+**Output:** Structured `.spec.md` file with: Problem & User, Goals/Non-goals, User Stories, EARS Acceptance Criteria, Edge Cases, Non-functional Requirements, Inputs & Provenance, Untrusted Inputs, Open Questions.
 
 ---
 
@@ -46,54 +75,57 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 ---
 
-## planner
+## implementation-planner
 
-**Purpose:** Designs step-by-step implementation plans that the implementor agent can execute without ambiguity.
+**Purpose:** Takes a spec file and translates it into a detailed implementation plan. Checks requirements, asks clarifying questions, proposes improvements, and produces step-by-step plans the implementor agent can execute.
 
 **Responsibilities:**
-- Reading all relevant CLAUDE.md, INSIGHTS.md, and existing code before planning
+- Reading the spec file as the source of truth for *what* to build
+- Reviewing requirements and asking clarifying questions when implementation details are ambiguous
+- Proposing implementation improvements, optimizations, and better approaches
 - Verifying architecture constraints against project rules
 - Tagging each step with skills the implementor should invoke
+- Asking permission before structuring multi-agent execution plans
 - Delegating external research to the researcher agent (never searches the web directly)
-- Saving the approved plan to `docs/<FeatureName>_plan.md` — the ONLY file it may create
+- Saving the approved plan to `<package>/specs/<feature-name>/<feature-name>_plan.md` — the ONLY file it may create
 
-**Permissions:** Read + Write (restricted to `docs/*_plan.md` only). No other file creation or editing.
+**Permissions:** Read + Write (restricted to `<package>/specs/<feature-name>/<feature-name>_plan.md` only). No other file creation or editing.
 
 | Tools | Why |
 |-------|-----|
 | Read, Grep, Glob | Mandatory research phase (CLAUDE.md, schemas, modules) |
 | Bash | Git history for recent changes |
-| Write | Save approved plan to `docs/<FeatureName>_plan.md` — the only allowed file |
+| Write | Save approved plan to `<package>/specs/<feature-name>/<feature-name>_plan.md` — the only allowed file |
 | Agent (researcher) | Delegate external research questions |
-| AskUserQuestion | Ask user to review the plan before saving |
+| AskUserQuestion | Clarify requirements, propose improvements, review plan before saving |
 | TaskCreate, TaskUpdate | Track progress |
 
 **Preloaded skills:** onion-architecture, postgresql-table-design, mermaid-diagram, typescript-expert, security, react-best-practices, fastify-best-practices, next-best-practices, react-frontend-best-practices, zod
 
-**Input:** Feature request, bug report, or refactoring goal.
+**Input:** Path to a `.spec.md` file.
 
-**Output:** Plan presented to user for review, then saved to `docs/<FeatureName>_plan.md` after approval. Contains context, constraints, pre-implementation checklist, ordered steps with skill tags, risk assessment, and out-of-scope notes.
+**Output:** Plan presented to user for review (with clarifying questions and recommendations), then saved to `<package>/specs/<feature-name>/<feature-name>_plan.md` after approval. Contains context, requirements summary, recommendations applied, constraints, pre-implementation checklist, ordered steps with skill tags and spec traceability, risk assessment, and out-of-scope notes.
 
 ---
 
 ## brainstorm
 
-**Purpose:** Multi-planner orchestrator that spawns N planner agents in parallel to generate independent solutions for the same problem, then compares all approaches with pros and cons.
+**Purpose:** Multi-planner orchestrator that spawns N implementation-planner agents in parallel to generate independent solutions for the same problem, then compares all approaches with pros and cons.
 
 **Responsibilities:**
 - Clarifying the problem statement and desired number of parallel planners (default 3)
 - Crafting diverse planner prompts (simplicity, extensibility, minimal changes)
-- Spawning all planner agents concurrently via Agent tool
+- Spawning all implementation-planner agents concurrently via Agent tool
 - Analyzing and comparing returned plans across 6 criteria
 - Producing a structured comparison report with summary table, detailed pros/cons, idea combinations, and recommendation
 
-**Permissions:** Read-only. Cannot modify files. Does not create plan files — delegates to planner sub-agents.
+**Permissions:** Read-only. Cannot modify files. Does not create plan files — delegates to implementation-planner sub-agents.
 
 | Tools | Why |
 |-------|-----|
 | Read, Grep, Glob | Understand codebase context for comparison |
 | Bash | Git history for context |
-| Agent (planner) | Spawn parallel planner sub-agents |
+| Agent (implementation-planner) | Spawn parallel planner sub-agents |
 | AskUserQuestion | Confirm problem scope and planner count |
 | TaskCreate, TaskUpdate | Track progress |
 
@@ -109,10 +141,10 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 ## implementor
 
-**Purpose:** Executes `.spec.md` plans by writing production code and tests, following each step in order.
+**Purpose:** Executes plans by writing production code and tests, following each step in order.
 
 **Responsibilities:**
-- Reading and following the spec file as source of truth
+- Reading and following the plan file as source of truth
 - Invoking tagged skills before writing code for each step
 - Running relevant tests after each step
 - Stopping and reporting back if the plan is wrong or incomplete (no improvising)
@@ -131,7 +163,7 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 **Preloaded skills:** typescript-expert, security, postgresql-table-design, mermaid-diagram, react-best-practices, fastify-best-practices, next-best-practices, react-frontend-best-practices, zod
 
-**Input:** Path to a `.spec.md` plan file.
+**Input:** Path to a `_plan.md` file.
 
 **Output:** Implementation report listing completed steps, files changed, skills applied, test results, deviations, and remaining work.
 
@@ -160,7 +192,7 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 **Preloaded skills:** react-testing-library, react-best-practices, react-frontend-best-practices, fastify-best-practices, drizzle-orm-patterns, zod, typescript-expert
 
-**Input:** File path, module name, or `.spec.md` plan with test requirements.
+**Input:** File path, module name, or plan file with test requirements.
 
 **Output:** Test files + test run results summary.
 
@@ -168,29 +200,38 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 ## architecture-reviewer
 
-**Purpose:** Read-only agent that checks architecture boundaries for a specific module on demand.
+**Purpose:** Read-only agent that checks architecture boundaries for modules affected by the current branch's changes. Auto-detects affected scope from `git diff main...HEAD`.
 
 **Responsibilities:**
+- Auto-detecting affected packages and modules from branch diff
+- Early exit when no architecture-relevant files changed
 - Checking onion architecture layer violations (domain → application → infrastructure)
 - Validating module isolation (no cross-module internal imports)
 - Verifying CLAUDE.md "Do not touch" rules (vendor/shared, INJECTION_GUARD, grounding gate)
 - Checking secrets handling (SecretsProvider only)
 - Providing evidence for every finding (file:line + code snippet)
 
+**Token optimization:**
+- Scopes review to changed files and their direct imports only
+- Loads skills selectively per affected package (not all skills every time)
+- Skips entire rule categories when the affected packages don't match
+- Uses `git diff` content instead of reading full files for protected-file checks
+- Reports only checked rules in "Clean Rules" section
+
 **Permissions:** Read-only. Cannot modify files.
 
 | Tools | Why |
 |-------|-----|
-| Read, Grep, Glob | Search for violations and read code |
-| Bash | Git diff/log/blame for change analysis |
-| Skill | Load onion-architecture and other review skills |
+| Read, Grep, Glob | Search for violations in changed files and imports |
+| Bash | Git diff to detect affected scope and check protected files |
+| Skill | Load only skills relevant to affected packages |
 | TaskCreate, TaskUpdate | Track progress |
 
-**Preloaded skills:** onion-architecture, react-frontend-best-practices, typescript-expert, security, fastify-best-practices, zod
+**Preloaded skills (loaded selectively):** onion-architecture, react-frontend-best-practices, typescript-expert, security, fastify-best-practices, zod
 
-**Input:** A specific module to review (e.g., "reviews module", "server/src/modules/agents").
+**Input:** Runs on the current branch — no explicit input needed (uses `git diff main...HEAD`).
 
-**Output:** Structured report with severity-classified findings, each with file:line evidence and rule source citation.
+**Output:** Structured report scoped to affected modules, with severity-classified findings, file:line evidence, and list of skipped/checked rule categories.
 
 ---
 
@@ -247,7 +288,7 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 | Bash | Git diff to see what changed |
 | TaskCreate, TaskUpdate | Track checklist progress |
 
-**Input:** Spec file path OR pasted plan text, optionally with a git range.
+**Input:** Plan file path OR pasted plan text, optionally with a git range.
 
 **Output:** Point-by-point verification table with PASS/FAIL/PARTIAL status and evidence for every requirement.
 
@@ -276,7 +317,7 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 
 **Preloaded skills:** mermaid-diagram, onion-architecture, react-frontend-best-practices, typescript-expert, fastify-best-practices, next-best-practices
 
-**Input:** Feature description, module name, or `.spec.md` plan.
+**Input:** Feature description, module name, or plan file.
 
 **Output:** Documentation files in `<package>/docs/<FeatureName>/` + report of what was written.
 
@@ -285,13 +326,14 @@ Nine specialized agents: a core **research → plan → implement** pipeline plu
 ## Pipeline Flow
 
 ```
-Optimized pipeline:   planner (self-explores) ──plan──> implementor ──report──> user
-                                                  │                    │
-                                                  └── delegates ───────┘ stops if plan is wrong
+Full pipeline:        spec-creator ──spec──> implementation-planner ──plan──> implementor ──report──> user
+                           │                    │                                │
+                           └── Q&A ──> user     ├── Q&A + recommendations ──> user
+                                                └── delegates ───────────────────┘ stops if plan is wrong
 
-Optional research:    planner ──delegates──> researcher (only for genuinely unknown domains)
+Optional research:    implementation-planner ──delegates──> researcher (only for genuinely unknown domains)
 
-Orchestration:        brainstorm ──spawns N──> planner (×N) ──plans──> brainstorm ──comparison──> user
+Orchestration:        brainstorm ──spawns N──> implementation-planner (×N) ──plans──> brainstorm ──comparison──> user
 
 Quality gates:        architecture-reviewer ──findings──> user     (sonnet, compact output)
                       security-reviewer ──findings──> user         (sonnet, compact output)
@@ -301,11 +343,13 @@ Support:              test-writer ──test files──> test results
                       doc-writer ──docs──> user
 ```
 
-The planner explores the codebase directly (no separate Explore agent needed) and presents
-plans as text for user review. Researcher is only spawned for genuinely unknown domains.
-The implementor executes approved plans. Quality gates (architecture-reviewer, security-reviewer,
-plan-verifier) run on sonnet with compact output (under 2000 words each) to minimize token
-usage. Support agents (test-writer, doc-writer) produce artifacts independently.
+The spec-creator analyzes feature prompts via multi-round Q&A and produces `.spec.md` files.
+The implementation-planner takes a spec file, reviews requirements, asks clarifying questions,
+proposes improvements, and produces a plan. Researcher is only spawned for genuinely unknown
+domains. The implementor executes approved plans. Quality gates (architecture-reviewer,
+security-reviewer, plan-verifier) run on sonnet with compact output (under 2000 words each)
+to minimize token usage. Support agents (test-writer, doc-writer) produce artifacts independently.
 
-**Token optimization:** Only planner and implementor use opus-class models. All reviewers,
-researcher, and brainstorm use sonnet with medium effort. Output caps prevent verbose reports.
+**Token optimization:** Only spec-creator, implementation-planner, and implementor use opus-class models.
+All reviewers, researcher, and brainstorm use sonnet with medium effort. Output caps prevent
+verbose reports.

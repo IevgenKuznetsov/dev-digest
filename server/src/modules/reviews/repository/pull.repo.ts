@@ -33,6 +33,19 @@ export async function getPrFiles(
   return db.select().from(t.prFiles).where(eq(t.prFiles.prId, prId));
 }
 
+export async function savePseudocodeSummaries(
+  db: Db,
+  prId: string,
+  summaries: Map<string, string>,
+): Promise<void> {
+  for (const [path, summary] of summaries) {
+    await db
+      .update(t.prFiles)
+      .set({ pseudocodeSummary: summary })
+      .where(and(eq(t.prFiles.prId, prId), eq(t.prFiles.path, path)));
+  }
+}
+
 /**
  * Record the commit a review just ran against, so the PR list can derive
  * `reviewed` vs `needs_review` (head moved since the last review) vs `stale`.

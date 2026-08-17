@@ -39,6 +39,10 @@ export class ReviewRepository {
     return pullRepo.getPrFiles(this.db, prId);
   }
 
+  savePseudocodeSummaries(prId: string, summaries: Map<string, string>): Promise<void> {
+    return pullRepo.savePseudocodeSummaries(this.db, prId, summaries);
+  }
+
   // ---- reviews + findings -------------------------------------------------
 
   insertReview(values: {

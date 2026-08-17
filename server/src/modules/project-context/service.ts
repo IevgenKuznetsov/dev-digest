@@ -1,0 +1,493 @@
+import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { dirname, basename } from 'node:path';
+import type { Container } from '../../platform/container.js';
+import { AppError, NotFoundError, ValidationError } from '../../platform/errors.js';
+import { resolveAndValidatePath } from '../../platform/paths.js';
+import type { ContextDocCategory, SpecReadEntry } from '@devdigest/shared';
+import { ProjectContextRepository } from './repository.js';
+import type { ContextDocRow } from './repository.js';
+import { scanDirectory, countTokens, validateFilename, validateContent } from './scanner.js';
+import { DEFAULT_GLOBS } from './helpers.js';
+import type { AgentContextDocEntry } from './repository.js';
+
+export interface ContextDocResult {
+  id: string;
+  workspaceId: string;
+  repoId: string;
+  path: string;
+  category: ContextDocCategory;
+  tokens: number;
+  scannedAt: Date;
+  createdAt: Date;
+}
+
+export interface ResolvedContextDoc extends ContextDocResult {
+  content: string;
+}
+
+/**
+ * Service for the project-context module. Owns all business logic for
+ * context document discovery, CRUD, attachment management, and context merge.
+ */
+export class ProjectContextService {
+  private repo: ProjectContextRepository;
+
+  constructor(private container: Container) {
+    this.repo = new ProjectContextRepository(container.db);
+  }
+
+  // ---- Scan guard ----------------------------------------------------------
+
+  async isScanRunning(repoId: string): Promise<boolean> {
+    return this.repo.isScanRunning(repoId);
+  }
+
+  // ---- Scanning ------------------------------------------------------------
+
+  /**
+   * Scan the repo's clone directory for markdown files and upsert their metadata.
+   * Returns the full list of docs for this repo after scan.
+   */
+  async scan(workspaceId: string, repoId: string): Promise<ContextDocRow[]> {
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('scan_error', 'Repository clone directory not available', 400);
+    }
+
+    // Verify the clone directory exists.
+    try {
+      await access(repoRow.clonePath);
+    } catch {
+      throw new AppError('scan_error', 'Repository clone directory does not exist (AC-X1)', 400);
+    }
+
+    const scanned = await scanDirectory(repoRow.clonePath, DEFAULT_GLOBS);
+    const now = new Date();
+
+    const upserted = await this.repo.upsertDocs(
+      scanned.map((f) => ({
+        workspaceId,
+        repoId,
+        path: f.path,
+        category: f.category,
+        tokens: f.tokens,
+        scannedAt: now,
+      })),
+    );
+
+    // Remove stale entries (files no longer on disk).
+    await this.repo.removeStale(repoId, scanned.map((f) => f.path));
+
+    return upserted;
+  }
+
+  // ---- Repo-scan (find without import) ------------------------------------
+
+  /**
+   * Scan the repo clone for .md files matching user-supplied glob patterns.
+   * Returns relative paths only — nothing is written to the DB.
+   */
+  async findByPatterns(
+    workspaceId: string,
+    repoId: string,
+    patterns: string[],
+  ): Promise<string[]> {
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('scan_error', 'Repository clone directory not available', 400);
+    }
+    try {
+      await access(repoRow.clonePath);
+    } catch {
+      throw new AppError('scan_error', 'Repository clone directory does not exist', 400);
+    }
+    const scanned = await scanDirectory(repoRow.clonePath, patterns);
+    return scanned.map((f) => f.path);
+  }
+
+  /**
+   * Import specific repo files (by relative path) into the context DB.
+   * Files that are unreadable or fail the path-traversal guard are silently skipped.
+   */
+  async importPaths(
+    workspaceId: string,
+    repoId: string,
+    paths: string[],
+  ): Promise<ContextDocRow[]> {
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('file_error', 'Repository clone directory not available', 400);
+    }
+
+    const now = new Date();
+    const toUpsert: Array<{
+      workspaceId: string;
+      repoId: string;
+      path: string;
+      category: ContextDocCategory;
+      tokens: number;
+      scannedAt: Date;
+    }> = [];
+
+    for (const relativePath of paths) {
+      let absolutePath: string;
+      try {
+        absolutePath = resolveAndValidatePath(repoRow.clonePath, relativePath);
+      } catch {
+        continue;
+      }
+      let content: string;
+      try {
+        content = await readFile(absolutePath, 'utf8');
+      } catch {
+        continue;
+      }
+      const tokens = countTokens(content);
+      const category = this.categoryForPath(relativePath);
+      toUpsert.push({ workspaceId, repoId, path: relativePath, category, tokens, scannedAt: now });
+    }
+
+    if (toUpsert.length === 0) return [];
+    return this.repo.upsertDocs(toUpsert);
+  }
+
+  // ---- Doc listing / retrieval ---------------------------------------------
+
+  async listDocs(workspaceId: string, repoId: string, search?: string): Promise<ContextDocRow[]> {
+    // Verify the repo belongs to this workspace before returning its docs (FIX-S4).
+    await this.getRepoRow(workspaceId, repoId);
+    return this.repo.listByRepo(repoId, search);
+  }
+
+  async getDoc(workspaceId: string, docId: string): Promise<ContextDocRow> {
+    const doc = await this.repo.getById(docId);
+    if (!doc) throw new NotFoundError('Context document not found');
+    if (doc.workspaceId !== workspaceId) throw new NotFoundError('Context document not found');
+    return doc;
+  }
+
+  // ---- File I/O ------------------------------------------------------------
+
+  async readContent(workspaceId: string, docId: string): Promise<string> {
+    const doc = await this.getDoc(workspaceId, docId);
+    const repoRow = await this.getRepoRowById(doc.repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('file_error', 'Repository clone directory not available', 400);
+    }
+
+    const filePath = resolveAndValidatePath(repoRow.clonePath, doc.path);
+    try {
+      return await readFile(filePath, 'utf8');
+    } catch (err: unknown) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') {
+        throw new AppError(
+          'file_not_found',
+          'File not found on disk — run a re-scan',
+          404,
+        );
+      }
+      throw new AppError('file_error', `Failed to read file: ${(err as Error).message}`, 500);
+    }
+  }
+
+  async writeContent(workspaceId: string, docId: string, content: string): Promise<ContextDocRow> {
+    const validation = validateContent(content);
+    if (!validation.ok) throw new ValidationError(validation.reason);
+
+    const doc = await this.getDoc(workspaceId, docId);
+    const repoRow = await this.getRepoRowById(doc.repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('file_error', 'Repository clone directory not available', 400);
+    }
+
+    const filePath = resolveAndValidatePath(repoRow.clonePath, doc.path);
+    try {
+      await writeFile(filePath, content, 'utf8');
+    } catch (err) {
+      throw new AppError('file_error', `Failed to write file: ${(err as Error).message}`, 500);
+    }
+
+    const tokens = countTokens(content);
+    const now = new Date();
+    await this.repo.updateTokens(docId, tokens, now);
+
+    const updated = await this.repo.getById(docId);
+    return updated!;
+  }
+
+  async createDoc(
+    workspaceId: string,
+    repoId: string,
+    directory: 'specs' | 'docs' | 'insights',
+    filename: string,
+    content = '',
+  ): Promise<ContextDocRow> {
+    const filenameValidation = validateFilename(filename);
+    if (!filenameValidation.ok) throw new ValidationError(filenameValidation.reason);
+
+    const contentValidation = validateContent(content);
+    if (!contentValidation.ok) throw new ValidationError(contentValidation.reason);
+
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('file_error', 'Repository clone directory not available', 400);
+    }
+
+    const relativePath = `${directory}/${filename}`;
+    const filePath = resolveAndValidatePath(repoRow.clonePath, relativePath);
+
+    // Check the file doesn't already exist.
+    try {
+      await access(filePath);
+      throw new ValidationError(`File already exists: ${relativePath}`);
+    } catch (err) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code !== 'ENOENT') throw err;
+      // ENOENT is expected — the file doesn't exist yet.
+    }
+
+    // Ensure the directory exists.
+    await mkdir(dirname(filePath), { recursive: true });
+
+    try {
+      await writeFile(filePath, content, 'utf8');
+    } catch (err) {
+      throw new AppError('file_error', `Failed to create file: ${(err as Error).message}`, 500);
+    }
+
+    const category = this.categoryForDirectory(directory, filename);
+    const tokens = countTokens(content);
+    const now = new Date();
+
+    const [doc] = await this.repo.upsertDocs([
+      { workspaceId, repoId, path: relativePath, category, tokens, scannedAt: now },
+    ]);
+    return doc!;
+  }
+
+  async deleteDoc(workspaceId: string, docId: string): Promise<void> {
+    // Ownership check only — does NOT remove the file from disk.
+    // Files belong to the repository; removing them here would be destructive
+    // and irreversible. Only the DB record (and its agent/skill links) is removed.
+    await this.getDoc(workspaceId, docId);
+    await this.repo.deleteById(docId);
+  }
+
+  async createFolder(
+    workspaceId: string,
+    repoId: string,
+    directory: 'specs' | 'docs' | 'insights',
+    name: string,
+  ): Promise<{ path: string }> {
+    const repoRow = await this.getRepoRow(workspaceId, repoId);
+    if (!repoRow.clonePath) {
+      throw new AppError('file_error', 'Repository clone directory not available', 400);
+    }
+
+    const relativePath = `${directory}/${name}`;
+    const dirPath = resolveAndValidatePath(repoRow.clonePath, relativePath);
+
+    try {
+      await mkdir(dirPath, { recursive: true });
+    } catch (err) {
+      throw new AppError('file_error', `Failed to create folder: ${(err as Error).message}`, 500);
+    }
+
+    return { path: relativePath };
+  }
+
+  // ---- Agent context attachments -------------------------------------------
+
+  async getAgentContext(workspaceId: string, agentId: string): Promise<{
+    attached: Array<ContextDocResult & { order: number }>;
+    totalAvailable: number;
+  }> {
+    // Verify the agent belongs to this workspace (IDOR guard — FIX-S2).
+    const agent = await this.repo.getAgentForWorkspace(workspaceId, agentId);
+    if (!agent) throw new NotFoundError('Agent not found');
+    const rows = await this.repo.getAgentDocs(agentId);
+    // We need repoId to count available — get from first doc or agent row.
+    // totalAvailable uses a separate count (all docs for any repo this agent touches).
+    // For simplicity: count from the first doc's repoId, or 0 if no docs.
+    const repoId = rows[0]?.doc.repoId;
+    const totalAvailable = repoId ? await this.repo.countByRepo(repoId) : 0;
+
+    return {
+      attached: rows.map((r) => ({ ...this.toResult(r.doc), order: r.order })),
+      totalAvailable,
+    };
+  }
+
+  async setAgentContext(
+    workspaceId: string,
+    agentId: string,
+    docs: AgentContextDocEntry[],
+  ): Promise<void> {
+    await this.repo.setAgentDocs(workspaceId, agentId, docs);
+  }
+
+  async getSkillContext(workspaceId: string, skillId: string): Promise<{
+    attached: Array<ContextDocResult & { order: number }>;
+    totalAvailable: number;
+  }> {
+    // Verify the skill belongs to this workspace (IDOR guard — FIX-S2).
+    const skill = await this.repo.getSkillForWorkspace(workspaceId, skillId);
+    if (!skill) throw new NotFoundError('Skill not found');
+    const rows = await this.repo.getSkillDocs(skillId);
+    const totalAvailable = 0; // Skill context doesn't count repo-wide available docs.
+    return {
+      attached: rows.map((r) => ({ ...this.toResult(r.doc), order: r.order })),
+      totalAvailable,
+    };
+  }
+
+  async setSkillContext(
+    workspaceId: string,
+    skillId: string,
+    docs: AgentContextDocEntry[],
+  ): Promise<void> {
+    await this.repo.setSkillDocs(workspaceId, skillId, docs);
+  }
+
+  // ---- Context merge (used by run-executor) --------------------------------
+
+  /**
+   * Resolve the effective context document set for an agent at review time.
+   * Implements the merge algorithm from the spec:
+   *   1. Agent-level docs (ordered)
+   *   2. Enabled skill docs (ordered by skill, then by doc order)
+   *   3. Deduplicate by path (first occurrence wins)
+   *   4. Read content from disk — skip missing files with a warning, but include
+   *      them in the output with tokens=0 so the trace shows what was expected.
+   */
+  async resolveContextForAgent(
+    agentId: string,
+    repoId: string,
+    onWarning?: (msg: string) => void,
+  ): Promise<Array<SpecReadEntry & { content: string }>> {
+    // Step 1: agent-level docs
+    const agentDocs = await this.repo.getAgentDocsForMerge(agentId);
+
+    // Step 2: enabled skills + their docs
+    const enabledSkills = await this.repo.getEnabledSkillsForAgent(agentId);
+    const skillDocs: ContextDocRow[] = [];
+    for (const skill of enabledSkills) {
+      const docs = await this.repo.getSkillDocsForMerge(skill.id);
+      skillDocs.push(...docs);
+    }
+
+    // Step 3: merge + deduplicate by path (first occurrence wins)
+    const all = [...agentDocs, ...skillDocs];
+    const seen = new Set<string>();
+    const deduped: ContextDocRow[] = [];
+    for (const doc of all) {
+      if (!seen.has(doc.path)) {
+        seen.add(doc.path);
+        deduped.push(doc);
+      }
+    }
+
+    if (deduped.length === 0) return [];
+
+    // Step 4: get the clone path for this repo (no workspace check — repoId comes from agent's docs)
+    const repoRow = await this.getRepoRowById(repoId);
+    if (!repoRow.clonePath) {
+      onWarning?.('context merge: repository clone directory not available, skipping all context docs');
+      return [];
+    }
+
+    // Step 5: read content from disk for each doc
+    const results: Array<SpecReadEntry & { content: string }> = [];
+    for (const doc of deduped) {
+      let filePath: string;
+      try {
+        filePath = resolveAndValidatePath(repoRow.clonePath, doc.path);
+      } catch {
+        onWarning?.(`context doc path traversal rejected: ${doc.path}, skipping`);
+        continue;
+      }
+      try {
+        const content = await readFile(filePath, 'utf8');
+        results.push({
+          path: doc.path,
+          category: doc.category as ContextDocCategory,
+          tokens: doc.tokens,
+          content,
+        });
+      } catch (err) {
+        const nodeErr = err as NodeJS.ErrnoException;
+        if (nodeErr.code === 'ENOENT') {
+          onWarning?.(`context doc missing on disk: ${doc.path}, skipping content but recording in trace`);
+          // Still include the entry in specs_read (with tokens=0) so the trace
+          // shows the doc was expected but unavailable.
+          results.push({
+            path: doc.path,
+            category: doc.category as ContextDocCategory,
+            tokens: 0,
+            content: '',
+          });
+        } else {
+          onWarning?.(`context doc read error: ${doc.path} — ${(err as Error).message}, skipping`);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  // ---- Private helpers -----------------------------------------------------
+
+  /**
+   * Fetch a repo row by id, verifying workspace ownership.
+   * Throws NotFoundError when the repo is missing or belongs to another workspace.
+   */
+  private async getRepoRow(workspaceId: string, repoId: string) {
+    const repo = await this.repo.getRepoForWorkspace(workspaceId, repoId);
+    if (!repo) throw new NotFoundError('Repository not found');
+    return repo;
+  }
+
+  /**
+   * Fetch a repo row by id without workspace check.
+   * Only use when repoId was derived from an already workspace-validated row
+   * (e.g. a contextDoc that already passed getDoc() ownership check).
+   */
+  private async getRepoRowById(repoId: string) {
+    const repo = await this.repo.getRepoById(repoId);
+    if (!repo) throw new NotFoundError('Repository not found');
+    return repo;
+  }
+
+  private categoryForDirectory(
+    directory: 'specs' | 'docs' | 'insights',
+    filename: string,
+  ): ContextDocCategory {
+    if (filename === 'INSIGHTS.md') return 'insights';
+    if (directory === 'specs') return 'specs';
+    if (directory === 'docs') return 'docs';
+    return 'insights';
+  }
+
+  /** Infer category from a relative path (used for repo-scan imports). */
+  private categoryForPath(relativePath: string): ContextDocCategory {
+    const name = basename(relativePath);
+    if (name === 'INSIGHTS.md' || /insight/i.test(name)) return 'insights';
+    if (/(?:^|\/)specs\//.test(relativePath)) return 'specs';
+    if (/(?:^|\/)docs\//.test(relativePath)) return 'docs';
+    return 'other';
+  }
+
+  private toResult(doc: ContextDocRow): ContextDocResult {
+    return {
+      id: doc.id,
+      workspaceId: doc.workspaceId,
+      repoId: doc.repoId,
+      path: doc.path,
+      category: doc.category as ContextDocCategory,
+      tokens: doc.tokens,
+      scannedAt: doc.scannedAt,
+      createdAt: doc.createdAt,
+    };
+  }
+}

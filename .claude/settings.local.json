@@ -1,16 +1,26 @@
 {
+  "env": {
+    "ENABLE_TOOL_SEARCH": "true"
+  },
   "permissions": {
     "allow": [
-      "Bash(pnpm exec:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm typecheck:*)",
-      "Bash(npm run:*)",
       "Bash(ls:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm view:*)",
+      "Bash(npm info:*)",
+      "Bash(npm run:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(npm test:*)"
     ]
   },
+  "enabledMcpjsonServers": [
+    "devdigest"
+  ],
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
@@ -20,6 +30,28 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/log-agent.js"
+          }
+        ]
+      }
     ]
+  },
+  "mcpServers": {
+    "devdigest": {
+      "command": "node",
+      "args": [
+        "./mcp-server/dist/index.js"
+      ],
+      "env": {
+        "DEVDIGEST_API_URL": "http://localhost:3001"
+      }
+    }
   }
 }

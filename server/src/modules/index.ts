@@ -9,6 +9,9 @@ import reviews from './reviews/routes.js';
 import repoIntel from './repo-intel/routes.js';
 import skills from './skills/routes.js';
 import conventions from './conventions/routes.js';
+import projectContext from './project-context/routes.js';
+import onboarding from './onboarding/routes.js';
+import riskBrief from './risk-brief/routes.js';
 
 /**
  * Module registry. Each feature module is a Fastify plugin in
@@ -34,4 +37,7 @@ export const modules: Record<string, FastifyPluginAsync> = {
   repoIntel,
   skills,
   conventions,
+  projectContext,
+  onboarding,
+  riskBrief,
 };
