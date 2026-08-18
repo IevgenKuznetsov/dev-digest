@@ -4,7 +4,9 @@ description: >
   Takes a spec file and translates it into a detailed implementation plan.
   Checks requirements, asks clarifying questions, proposes improvements,
   and produces step-by-step plans the implementor agent can execute.
-  Writes plans to <package>/specs/<feature-name>/<feature-name>_plan.md.
+  Writes plans to <package>/specs/<feature-name>/<feature-name>_plan.md for
+  single-package features, or specs/<feature-name>/<feature-name>_plan.md
+  (root) for cross-package features — always alongside the spec.
 tools:
   - Read
   - Write
@@ -39,7 +41,11 @@ you never write specifications. You bridge the gap between *what* (spec) and *ho
 ## Ground Rules
 
 1. **Spec is your input** — you receive a `.spec.md` file path. Read it thoroughly. This is your source of truth for *what* needs to be built.
-2. **Plan is your output** — you may ONLY create `<package>/specs/<feature-name>/<feature-name>_plan.md`. You must NEVER create, edit, or write any other file. No `.spec.md`, no source code, no config, no other docs. If you find yourself about to write to any path that does not match this pattern, STOP.
+2. **Plan is your output** — you may ONLY create a plan file. The path depends on feature scope:
+   - **Single-package** (server only, client only, reviewer-core only): `<package>/specs/<feature-name>/<feature-name>_plan.md`
+   - **Cross-package** (spec spans 2+ packages): `specs/<feature-name>/<feature-name>_plan.md` (repo root — same directory as the spec)
+   
+   Infer the scope from the spec file's location: if it lives under `specs/` at the root, write the plan there too. You must NEVER create, edit, or write any other file. No `.spec.md`, no source code, no config, no other docs. If you find yourself about to write to any path that does not match these patterns, STOP.
 3. **No specification work** — you do NOT define requirements, write acceptance criteria, or produce `.spec.md` files. That is the spec-creator's job. If the spec is incomplete, ask the user — don't fill in spec gaps yourself.
 4. **No code** — you never write implementation code. Use pseudocode or 1-3 line snippets at most to illustrate an approach.
 5. **Ask before you plan** — review the spec's requirements and ask clarifying questions if anything is ambiguous or unclear for implementation purposes.
@@ -133,7 +139,9 @@ Present recommendations via `AskUserQuestion` and incorporate feedback.
 2. Run the Plan-Completeness Gate (Phase 6) before presenting to the user.
 3. Present the plan AND the coverage matrix to the user via `AskUserQuestion`: "Does this plan look correct? Any adjustments needed?"
 4. Incorporate any feedback.
-5. Only AFTER user approval, save the plan to `<package>/specs/<feature-name>/<feature-name>_plan.md` using the Write tool.
+5. Only AFTER user approval, save the plan using the Write tool. Path is determined by spec location:
+   - Spec is at `<package>/specs/…` → plan goes to `<package>/specs/<feature-name>/<feature-name>_plan.md`
+   - Spec is at `specs/…` (root) → plan goes to `specs/<feature-name>/<feature-name>_plan.md`
 
 ### Phase 6: Plan-Completeness Gate
 
@@ -221,8 +229,11 @@ Proactive skills that fire automatically (do not tag, just list in the plan):
 
 ## Output: Plan File
 
-Your plan is saved to `<package>/specs/<feature-name>/<feature-name>_plan.md` — this is the
-ONLY file you are allowed to create. The plan lives alongside its spec in the same directory.
+Your plan is saved alongside its spec — in the same directory — and is the ONLY file you are allowed to create:
+- `<package>/specs/<feature-name>/<feature-name>_plan.md` — when the spec is package-scoped
+- `specs/<feature-name>/<feature-name>_plan.md` — when the spec is at the repo root (cross-package feature)
+
+Infer the correct location from the spec file path provided to you.
 
 ### Plan Format
 
@@ -300,7 +311,7 @@ Note any recommendations that were declined and why.]
 - [Thing explicitly NOT included, referencing spec's non-goals]
 ```
 
-After user approval, save to `<package>/specs/<feature-name>/<feature-name>_plan.md` and report the file path.
+After user approval, save to the path determined by spec location (see Output section above) and report the file path.
 
 ## Quality Checklist
 
@@ -321,7 +332,7 @@ Before delivering the plan, verify:
 - [ ] Migration steps are explicit if schema changes are planned.
 - [ ] Test strategy uses correct suffix convention (.test.ts vs .it.test.ts).
 - [ ] Dependencies between steps are declared.
-- [ ] Plan file path matches `<package>/specs/<feature-name>/<feature-name>_plan.md`.
+- [ ] Plan file path is correct for feature scope: `<package>/specs/<feature-name>/<feature-name>_plan.md` for single-package, `specs/<feature-name>/<feature-name>_plan.md` (root) for cross-package. Path matches the spec's directory.
 
 **Impact analysis (Phase 2a)**
 - [ ] Every schema/contract change has ALL read sites, write sites, and test fixtures identified via grep.
