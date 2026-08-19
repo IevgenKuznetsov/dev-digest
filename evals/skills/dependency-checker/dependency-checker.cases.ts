@@ -1,9 +1,15 @@
 import type { SkillCase } from "../../src/index.js";
+import { fixtureReader } from "../../src/index.js";
 
 // This skill's job is to analyze real files (package.json, tsconfig.json, node_modules sizes),
 // but "quality" cases run with no tools (skillTask measures the SKILL.md content in isolation —
 // see tasks.ts). So each prompt inlines a small synthetic dataset the skill can reason over
 // directly, standing in for what the skill would normally gather itself with Read/Bash/Grep.
+
+const fixture = fixtureReader(import.meta.url);
+const SIZES_DATA = fixture("package-sizes.md");
+const VULN_DATA = fixture("vulnerability-report.md");
+const OUTDATED_DATA = fixture("outdated-report.md");
 
 const REPO_DATA = `Here is the data you'd normally gather yourself — treat it as already collected, and produce the report directly from it (do not ask for tool access or more data).
 
@@ -79,5 +85,57 @@ export const cases: SkillCase[] = [
     ],
     threshold: 0.6,
     maxTurns: 10,
+  },
+  {
+    name: "security vulnerabilities map to P0/P1 priorities with specific CVE details",
+    kind: "quality",
+    prompt: `Run a dependency health check on this repo and include a full security audit section with prioritized suggestions.\n\n${VULN_DATA}`,
+    grounding: ["P0-CRITICAL", "P1-HIGH"],
+    practices: [
+      "the Security Audit section includes a severity table with CRITICAL and HIGH rows, and shows count 1 for CRITICAL",
+      "the pg vulnerability is listed as a [P0-CRITICAL] suggestion in the Prioritized Suggestions section",
+      "the moment vulnerability is listed as a [P1-HIGH] suggestion, not a lower priority tier",
+      "the P0-CRITICAL suggestion for pg specifies upgrading to version 8.12.0 or a version satisfying >=8.12.0",
+      "the Prioritized Suggestions section places P0-CRITICAL items before P1-HIGH items",
+    ],
+    threshold: 0.7,
+    maxTurns: 10,
+  },
+  {
+    name: "installed sizes above thresholds are flagged as HEAVY or NOTABLE in the size breakdown",
+    kind: "quality",
+    prompt: `Run a dependency health check and produce the full size breakdown table, applying HEAVY and NOTABLE flags where appropriate.\n\n${SIZES_DATA}`,
+    grounding: ["HEAVY"],
+    practices: [
+      "next at 132 MB is explicitly labeled HEAVY in the size breakdown table or flagged as exceeding 50 MB",
+      "playwright at 210 MB is explicitly labeled HEAVY",
+      "date-fns at 22 MB is explicitly labeled NOTABLE or flagged as exceeding 20 MB",
+      "at least one dependency under 20 MB (such as fastify, zod, or pg) appears in the table without a HEAVY or NOTABLE flag",
+    ],
+    threshold: 0.6,
+    maxTurns: 10,
+  },
+  {
+    name: "outdated packages section classifies updates by MAJOR / MINOR / PATCH severity",
+    kind: "quality",
+    prompt: `Run a dependency health check on this repo and include the full outdated packages section.\n\n${OUTDATED_DATA}`,
+    grounding: ["MAJOR", "MINOR", "PATCH"],
+    practices: [
+      "moment's update from 2.29.4 to 3.0.1 is classified as MAJOR severity",
+      "tailwindcss's update from 3.4.14 to 4.1.3 is classified as MAJOR severity",
+      "next's update from 15.0.3 to 15.4.0 is classified as MINOR severity",
+      "at least one patch-level update (pg, vitest, or playwright) is classified as PATCH severity",
+      "MAJOR severity items are described as potentially or likely breaking",
+      "the section ends with a total count summarizing outdated packages broken down by MAJOR, MINOR, and PATCH",
+    ],
+    threshold: 0.6,
+    maxTurns: 10,
+  },
+  {
+    name: "Mermaid dependency map uses HTML char codes for parentheses in node labels",
+    kind: "grounding",
+    prompt: `Generate the Mermaid dependency map section of the dependency health report, showing each package and its heaviest dependencies with size annotations in the node labels.\n\n${SIZES_DATA}`,
+    grounding: ["```mermaid", "mindmap", "&#40;"],
+    maxTurns: 6,
   },
 ];
