@@ -1,25 +1,37 @@
-diff --git a/client/src/app/prs/page.tsx b/client/src/app/prs/page.tsx
-index 1234567..abcdefg 100644
---- a/client/src/app/prs/page.tsx
-+++ b/client/src/app/prs/page.tsx
-@@ -1,5 +1,18 @@
-+import { useState, useEffect } from "react";
- import { PRListView } from "./_components/PRListView/PRListView.js";
+diff --git a/client/src/app/repos/[repoId]/pulls/page.tsx b/client/src/app/repos/[repoId]/pulls/page.tsx
+index abc1234..def5678 100644
+--- a/client/src/app/repos/[repoId]/pulls/page.tsx
++++ b/client/src/app/repos/[repoId]/pulls/page.tsx
+@@ -1,10 +1,28 @@
+ "use client";
 
--export default function PRsPage() {
--  return <PRListView />;
-+export default function PRsPage() {
-+  const [prs, setPrs] = useState<{ id: string; title: string }[]>([]);
-+  const [loading, setLoading] = useState(false);
+-import { useParams } from "next/navigation";
++import { useState, useEffect } from "react";
++import { useParams } from "next/navigation";
+ import { AppShell } from "@/components/app-shell";
+-import { usePulls } from "@/lib/hooks";
+ import { PRRow } from "./_components/PRRow";
+
+ export default function PullsPage() {
+   const params = useParams<{ repoId: string }>();
+-  const { data: pulls, isLoading } = usePulls(params.repoId);
++  const [pulls, setPulls] = useState<{ number: number; title: string }[]>([]);
++  const [isLoading, setIsLoading] = useState(false);
 +
 +  useEffect(() => {
-+    setLoading(true);
-+    fetch("/api/prs")
++    setIsLoading(true);
++    fetch(`/api/repos/${params.repoId}/pulls`)
 +      .then((r) => r.json())
-+      .then((data) => setPrs(data))
-+      .finally(() => setLoading(false));
-+  }, []);
++      .then(setPulls)
++      .finally(() => setIsLoading(false));
++  }, [params.repoId]);
 +
-+  if (loading) return <div>Loading…</div>;
-+  return <PRListView prs={prs} />;
+   return (
+     <AppShell>
+-      {isLoading ? <div>Loading…</div> : pulls?.map((pr) => <PRRow key={pr.number} pr={pr} repoId={params.repoId} />)}
++      {isLoading
++        ? <div>Loading…</div>
++        : pulls.map((pr) => <PRRow key={pr.number} pr={pr} repoId={params.repoId} />)}
+     </AppShell>
+   );
  }

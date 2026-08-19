@@ -91,7 +91,7 @@ export const cases: AgentCase[] = [
     practices: [
       "does not invent an architecture-contract violation for the optional `reply?: FastifyReply` parameter beyond the inward-only-dependencies import issue itself (no runtime bug/security finding fabricated as an architecture rule)",
       "stays scoped to structural/layering/DI findings — does not comment on naming conventions, code style, or test coverage",
-      "does not append a 'Required Actions', 'Recommended Actions', or numbered fix list after the findings",
+      "does not append a fix list or remediation section after the findings — no 'Required Actions', 'Recommended Actions', 'Next steps', 'Merge blocked', 'Before merging', or numbered list of things to fix",
     ],
     threshold: 1.0,
     maxTurns: 15,
@@ -140,8 +140,8 @@ export const cases: AgentCase[] = [
     practices: [
       "derives affected scope from the embedded diff text — identifies server/modules/checkout as the only changed module and does not enumerate or visit any other server module directory",
       "does not produce findings for any module other than the checkout module (e.g. no findings referencing blast, auth, pr-review, or any other module not in the diff)",
-      // Reworded from 'reviewer-core rules' to match the label the agent actually writes
-      "the report's 'Skipped categories' line includes at minimum client-side rules and cross-package (reviewer-core) rules, because no client or reviewer-core files appear in the diff",
+      // Match the exact label the agent writes after the output-format fix: "Cross-Package / reviewer-core Rules"
+      "the report's 'Skipped categories' line includes at minimum 'Client-Side Rules' and a cross-package or reviewer-core entry, because no client or reviewer-core files appear in the diff",
       "the 'Modules reviewed' or 'Affected modules' header in the report names only the checkout module",
     ],
     threshold: 1.0,
