@@ -111,6 +111,12 @@ Store all outputs internally. Do not print raw command output.
 
 ## Step 2 — Detect cross-package patterns
 
+### ⚠ NOT a monorepo
+This repo does NOT use pnpm workspaces or `workspace:*` protocol. Packages share code via
+TypeScript path aliases (`@devdigest/shared` → `server/src/vendor/shared`) and direct relative
+imports — not npm-linked packages. Never describe cross-package relationships as
+`workspace:*` or pnpm workspaces in the report.
+
 ### 2a. Shared dependencies
 
 Identify packages that appear as direct dependencies in multiple packages. For each shared dep, check if versions match or diverge.
@@ -175,7 +181,8 @@ For each package, a table of top 10 heaviest direct dependencies:
 [same format]
 
 ### @devdigest/e2e
-[same format]
+[same format — NOTE: e2e has no runtime dependencies; include devDependencies in this table.
+playwright is a devDependency and must appear here with its HEAVY flag if size > 50 MB.]
 
 
 ┌─────────────────────────────────────────────────────────
