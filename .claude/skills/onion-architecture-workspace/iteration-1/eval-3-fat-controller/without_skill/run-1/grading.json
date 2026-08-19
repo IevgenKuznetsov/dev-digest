@@ -1,0 +1,56 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies the fat controller / missing service layer anti-pattern",
+      "passed": true,
+      "evidence": "The billing module is implemented as a single 'fat controller' — all business logic, data access, and external API orchestration lives directly inside Fastify route handlers. [...] ### 1. No Service or Domain Layer (Critical)"
+    },
+    {
+      "text": "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers",
+      "passed": true,
+      "evidence": "A `BillingService` (or equivalent application-layer class) that owns orchestration logic such as 'create or retrieve Stripe customer, create subscription, persist record.' [...] Any change to subscription creation logic (e.g., adding trial periods, applying coupons) requires touching route-handler code, which should be concerned only with HTTP concerns (parsing, validation, response shaping)."
+    },
+    {
+      "text": "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer",
+      "passed": true,
+      "evidence": "Every route handler directly imports and calls `stripe.*` and `db.*`. There is no intermediate layer that encapsulates business logic. [...] ### 2. Stripe Client Instantiated as a Module-Level Singleton (High) [...] Makes it impossible to inject a mock Stripe client in tests — there is no seam."
+    },
+    {
+      "text": "Flags direct DB queries (db.select, db.update) in route handlers",
+      "passed": true,
+      "evidence": "Every route handler directly imports and calls `stripe.*` and `db.*`. [...] A repository or data-access layer that wraps the Drizzle queries so they can be swapped or mocked in tests. [...] await db.update(subscriptions).set({ status: 'cancelled', ... }).where(...); const [user] = await db.select().from(users).where(eq(users.id, userId));"
+    },
+    {
+      "text": "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)",
+      "passed": true,
+      "evidence": "Extract a `BillingRepository` — owns all Drizzle queries for `subscriptions` and `invoices`. Returns typed domain objects, not raw DB rows. Create a `BillingService` — orchestrates adapter + repository calls. Contains all business logic (create-or-get-customer, cancel-with-status-update, etc.)."
+    },
+    {
+      "text": "Notes the missing composition root / dependency injection",
+      "passed": true,
+      "evidence": "The Stripe client is instantiated at module load time using `process.env` directly. [...] Makes it impossible to inject a mock Stripe client in tests — there is no seam. [...] Instantiate the Stripe client inside a `StripeAdapter` class that accepts the key via constructor injection (from `SecretsProvider`). Register it as a Fastify plugin/decorator so it can be overridden in tests."
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 3,
+    "errors_encountered": 0,
+    "output_chars": 6041,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 72.38,
+    "total_duration_seconds": 72.4
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

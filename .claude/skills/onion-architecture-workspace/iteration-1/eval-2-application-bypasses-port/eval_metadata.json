@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "application-bypasses-port",
+  "prompt": "We're doing a pre-merge architecture review of the analytics module. The team built it quickly and I want a second set of eyes before it lands in main. What do you see?",
+  "assertions": [
+    "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface",
+    "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)",
+    "Identifies that routes.ts imports AnalyticsRepository directly (presentation → infrastructure violation)",
+    "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer",
+    "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer"
+  ]
+}

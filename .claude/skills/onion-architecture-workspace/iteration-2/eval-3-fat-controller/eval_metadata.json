@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "eval_name": "fat-controller",
+  "prompt": "The billing module shipped last sprint. Can you do an architecture review on it and let me know if there are structural issues we should address before the codebase grows?",
+  "assertions": [
+    "Identifies the partial-failure / atomicity risk in /billing/cancel: stripe.subscriptions.cancel() is called before the DB update, so a DB failure after the Stripe call leaves state inconsistent with no rollback",
+    "Notes that the Stripe client is instantiated at module scope bypassing a secrets/config abstraction — it lacks an injection seam for testing and violates the adapter pattern",
+    "Identifies that the webhook handler embeds at least 3 distinct business event handlers (subscription updated, subscription deleted, invoice.payment_failed) inline rather than delegating to separate use cases or handlers",
+    "Recommends a StripeAdapter or StripePort (port/adapter pair) as the correct abstraction — not just 'inject the Stripe client'",
+    "Notes that GET /billing/invoices has a write side effect (upsert into DB) making it non-idempotent and violating HTTP GET semantics — and that this decision logic belongs in a use case, not a route"
+  ]
+}

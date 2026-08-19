@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface",
+      "passed": true,
+      "evidence": "Finding 5 states: 'There is no interface/port separating AnalyticsService from AnalyticsRepository. The service imports the concrete class directly: import { AnalyticsRepository } from \"./repository\";' and 'application depends on infrastructure rather than infrastructure depending on application.'"
+    },
+    {
+      "text": "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)",
+      "passed": true,
+      "evidence": "Finding 2 explicitly shows the constructor code 'this.repo = new AnalyticsRepository();' and states: 'AnalyticsService instantiates AnalyticsRepository directly inside its constructor. This is constructor-side coupling: the service controls its own infrastructure dependency, making it impossible to swap implementations, mock the repository in unit tests, or apply dependency injection at the composition root.'"
+    },
+    {
+      "text": "Identifies that routes.ts imports AnalyticsRepository directly (presentation \u2192 infrastructure violation)",
+      "passed": true,
+      "evidence": "Finding 3 shows 'const repo = new AnalyticsRepository();' in routes.ts and states 'The route factory creates its own service and repository instances.' The Layer Dependency Summary table explicitly flags 'routes.ts \u2192 AnalyticsRepository' as 'Routes \u2192 Infrastructure (skip application) | YES'."
+    },
+    {
+      "text": "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer",
+      "passed": true,
+      "evidence": "Finding 1 (CRITICAL) explicitly identifies: 'The /analytics/live route imports the Drizzle db singleton and the pageViews schema table directly and executes a raw query... const rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);' and states 'This violates the fundamental onion rule that outer layers may only call inward through defined ports.'"
+    },
+    {
+      "text": "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer",
+      "passed": true,
+      "evidence": "Finding 2 Fix section recommends: '// domain/ports.ts export interface IAnalyticsRepository { ... }' and Finding 5 Fix section states: 'Define IAnalyticsRepository in domain/ports.ts (or application/ports.ts) and have AnalyticsRepository implement it.' Remediation step 4 also lists: 'Extract IAnalyticsRepository port. Inject into AnalyticsService via constructor.'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 6,
+    "errors_encountered": 0,
+    "output_chars": 5891,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 74.83,
+    "total_duration_seconds": 74.8
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

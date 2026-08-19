@@ -1,0 +1,13 @@
+{
+  "eval_id": 3,
+  "eval_name": "fat-controller",
+  "prompt": "The billing module shipped last sprint. Can you do an architecture review on it and let me know if there are structural issues we should address before the codebase grows?",
+  "assertions": [
+    "Identifies the fat controller / missing service layer anti-pattern",
+    "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers",
+    "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer",
+    "Flags direct DB queries (db.select, db.update) in route handlers",
+    "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)",
+    "Notes the missing composition root / dependency injection"
+  ]
+}

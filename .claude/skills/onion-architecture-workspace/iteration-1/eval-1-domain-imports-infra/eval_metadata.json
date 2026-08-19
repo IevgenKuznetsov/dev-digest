@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "domain-imports-infra",
+  "prompt": "We just merged a notification module into the server. I want to make sure the code is architecturally clean before we cut a release. Can you review the implementation and flag anything that doesn't follow proper layering?",
+  "assertions": [
+    "Identifies that the domain layer (NotificationService.ts) imports from infrastructure (db or drizzle-orm)",
+    "Names the dependency rule violation explicitly — domain should have zero external dependencies",
+    "Suggests introducing a repository interface in the domain layer",
+    "Suggests moving Drizzle logic to a separate repository/infrastructure file",
+    "Notes that routes.ts instantiates the service directly rather than using a composition root"
+  ]
+}

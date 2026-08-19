@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Uses the term 'port' or 'repository interface' (not just 'interface') when prescribing the fix — and specifies it belongs in the domain layer",
+      "passed": true,
+      "evidence": "Violation 2 heading reads 'Missing Port — No Repository Interface in the Domain'. The body states: 'the domain layer defines *what* it needs from persistence as an interface (a **port**), and the infrastructure layer provides the concrete implementation (an **adapter**).' The fix is prescribed as creating `domain/ports.ts` with a `NotificationRepository` interface."
+    },
+    {
+      "text": "Identifies that NotificationService has zero domain logic — it is entirely Drizzle persistence code misplaced in the domain folder",
+      "passed": true,
+      "evidence": "Violation 1 states: 'There is no domain logic in this file at all. Every method is a raw Drizzle query' and lists all six methods as 'pure persistence'. Concludes: 'What is named `NotificationService` is, in substance, a **Drizzle repository** — it belongs in the infrastructure layer, not the domain layer.'"
+    },
+    {
+      "text": "Names what the correct infrastructure file should be (e.g. repository.ts or infrastructure/NotificationRepository.ts) as the destination for the Drizzle code",
+      "passed": true,
+      "evidence": "Layer 3 section names the destination file explicitly: '`infrastructure/repository.ts` — `DrizzleNotificationRepository` class' and provides a full class skeleton showing `export class DrizzleNotificationRepository implements NotificationRepository`."
+    },
+    {
+      "text": "Distinguishes the three layers that need to exist: domain (port/interface), application (service/use-cases), infrastructure (Drizzle repo) — not just 'move the DB code'",
+      "passed": true,
+      "evidence": "The 'Required Remediation: Three-Layer Split' section explicitly names and describes all three: 'Layer 1 — Domain (`modules/notification/domain/`)' for entities and ports, 'Layer 2 — Application (`modules/notification/service.ts`)' for the service/use-case class, and 'Layer 3 — Infrastructure (`modules/notification/infrastructure/repository.ts`)' for Drizzle queries."
+    },
+    {
+      "text": "Notes that routes.ts instantiates the service with `new` at module scope and explains this bypasses the composition root / DI wiring",
+      "passed": true,
+      "evidence": "Violation 3 quotes `const service = new NotificationService();` from `routes.ts` line 5 and states: 'The composition root in this project is `platform/container.ts`. It is the **only** file that is permitted to construct concrete implementations... By calling `new NotificationService()` in `routes.ts`, the routes file becomes its own mini-composition root. This breaks the pattern in two ways: 1. There is now no single place to swap the implementation... 2. The constructed object is a module-level singleton whose lifecycle is tied to module load time, not to the application's startup sequence.'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 11,
+    "errors_encountered": 0,
+    "output_chars": 7841,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 82.473,
+    "total_duration_seconds": 82.5
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

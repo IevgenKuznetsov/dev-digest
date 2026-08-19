@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that the domain layer (NotificationService.ts) imports from infrastructure (db or drizzle-orm)",
+      "passed": true,
+      "evidence": "Critical Issue #1 heading: 'Domain Layer Directly Imports Infrastructure (Drizzle + DB Connection)' with quoted imports: \"import { eq, and } from 'drizzle-orm'; import { db } from '../../../db'; import { notifications } from '../../../db/schema';\""
+    },
+    {
+      "text": "Names the dependency rule violation explicitly — domain should have zero external dependencies",
+      "passed": true,
+      "evidence": "\"In a properly layered architecture (Onion / Clean / Hexagonal), the domain layer must have zero knowledge of how data is persisted. It should define interfaces (ports) that infrastructure implementations fulfill.\""
+    },
+    {
+      "text": "Suggests introducing a repository interface in the domain layer",
+      "passed": true,
+      "evidence": "Fix section shows: \"// domain/INotificationRepository.ts\\nexport interface INotificationRepository { findUnreadByUser(userId: string): Promise<Notification[]>; ... }\" and recommended structure includes 'INotificationRepository.ts # Port (interface)' under domain/"
+    },
+    {
+      "text": "Suggests moving Drizzle logic to a separate repository/infrastructure file",
+      "passed": true,
+      "evidence": "Fix section shows: \"// infrastructure/DrizzleNotificationRepository.ts\\nimport { eq, and } from 'drizzle-orm'; ... export class DrizzleNotificationRepository implements INotificationRepository { // ... all Drizzle queries live here }\""
+    },
+    {
+      "text": "Notes that routes.ts instantiates the service directly rather than using a composition root",
+      "passed": true,
+      "evidence": "Moderate Issue #3: 'Module-Level Singleton Service in Routes' — \"NotificationService is instantiated as a module-level singleton with no way to inject dependencies (because the current implementation takes no constructor arguments).\""
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 5,
+    "errors_encountered": 0,
+    "output_chars": 7098,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 66.6,
+    "total_duration_seconds": 66.6
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

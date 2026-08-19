@@ -1,0 +1,333 @@
+{
+  "metadata": {
+    "skill_name": "onion-architecture",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-08-19T11:41:39Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 88.7,
+        "tokens": 9851,
+        "tool_calls": 9,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that the domain layer (NotificationService.ts) imports from infrastructure (db or drizzle-orm)",
+          "passed": true,
+          "evidence": "Violation 1 is titled 'Domain Layer Imports Infrastructure (CRITICAL)' and quotes the exact imports: `import { eq, and } from 'drizzle-orm';`, `import { db } from '../../../db';`, `import { notifications } from '../../../db/schema';` from NotificationService.ts lines 1\u0432\u0402\u201c3."
+        },
+        {
+          "text": "Names the dependency rule violation explicitly \u0432\u0402\u201d domain should have zero external dependencies",
+          "passed": true,
+          "evidence": "\"The domain layer is the innermost ring of the onion. It must have **zero external dependencies** \u0432\u0402\u201d no Drizzle, no Fastify, no npm packages.\""
+        },
+        {
+          "text": "Suggests introducing a repository interface in the domain layer",
+          "passed": true,
+          "evidence": "Fix section proposes creating `domain/ports.ts` with `export interface NotificationRepository { findUnread, countUnread, markRead, markAllRead, create, deleteReadOlderThan }`. Remediation step 2: \"Create `domain/ports.ts` \u0432\u0402\u201d define `NotificationRepository` interface with domain-typed method signatures.\""
+        },
+        {
+          "text": "Suggests moving Drizzle logic to a separate repository/infrastructure file",
+          "passed": true,
+          "evidence": "Fix section proposes creating `infrastructure/NotificationRepository.ts` with `export class DrizzleNotificationRepository implements NotificationRepository` containing all Drizzle queries. Remediation step 3: \"Create `infrastructure/NotificationRepository.ts` \u0432\u0402\u201d move all Drizzle code here, implementing the port.\""
+        },
+        {
+          "text": "Notes that routes.ts instantiates the service directly rather than using a composition root",
+          "passed": true,
+          "evidence": "Violation 2 states: \"`routes.ts` calls `new NotificationService()` directly, hard-wiring the concrete class into the presentation layer\" and \"Bypasses the composition root: `platform/container.ts` is the designated wiring point for the project. Creating service instances in route files circumvents this pattern.\""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 102.8,
+        "tokens": 8388,
+        "tool_calls": 11,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface",
+          "passed": true,
+          "evidence": "Violation 1: 'import { AnalyticsRepository } from './repository';   // imports the CONCRETE class' \u0432\u0402\u201d 'The Application layer (service.ts) must depend on an interface (port) defined in the Domain layer, not on a concrete infrastructure class.'"
+        },
+        {
+          "text": "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)",
+          "passed": true,
+          "evidence": "Violation 2: 'constructor() { this.repo = new AnalyticsRepository(); }' \u0432\u0402\u201d 'The composition root (platform/container.ts) is the only place that should construct concrete implementations... When a service constructs its own collaborators, it bypasses the container entirely. This is the service locator anti-pattern.'"
+        },
+        {
+          "text": "Identifies that routes.ts imports AnalyticsRepository directly (presentation \u0432\u2020\u2019 infrastructure violation)",
+          "passed": true,
+          "evidence": "Violation 3: 'import { AnalyticsRepository } from './repository';  // infrastructure import in presentation' \u0432\u0402\u201d 'The Presentation layer (routes.ts) must depend on the Application layer only. It must not import from infrastructure (repository.ts, db/schema, drizzle-orm) or bypass the service layer.'"
+        },
+        {
+          "text": "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer",
+          "passed": true,
+          "evidence": "Violation 3: '/analytics/live bypasses ALL layers \u0432\u0402\u201d raw SQL query in a route handler' with code showing 'const rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);' inside the route handler."
+        },
+        {
+          "text": "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer",
+          "passed": true,
+          "evidence": "Violation 5 and Fix for Violation 1: 'Add domain/ports.ts as shown in Violation 1's fix. This is the prerequisite for every other fix.' \u0432\u0402\u201d provides concrete interface: 'export interface AnalyticsPort { record(view: PageView): Promise<void>; getDashboardStats(fromDate: Date): Promise<DashboardStats>; getRecentViews(limit: number): Promise<PageView[]>; }'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 89.8,
+        "tokens": 8741,
+        "tool_calls": 9,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies the fat controller / missing service layer anti-pattern",
+          "passed": true,
+          "evidence": "The billing module, as shipped, is a textbook example of the Fat Controller anti-pattern. Every route handler in routes.ts performs direct database access, calls the Stripe API directly, implements business logic, and manages state transitions \u0432\u0402\u201d all without a service layer, a repository, or any domain abstraction."
+        },
+        {
+          "text": "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers",
+          "passed": true,
+          "evidence": "GET /billing/subscription \u0432\u0402\u201d retrieves the local subscription record, then calls stripe.subscriptions.retrieve(), computes daysLeft, derives isActive, and extracts planName. This is application-layer orchestration and domain computation sitting in the route handler."
+        },
+        {
+          "text": "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer",
+          "passed": true,
+          "evidence": "GET /billing/portal \u0432\u0402\u201d the simplest handler but still makes a direct Stripe API call inside the route. Also: Infrastructure clients belong in the infrastructure layer, constructed by the Container (composition root), not hardcoded in the presentation layer."
+        },
+        {
+          "text": "Flags direct DB queries (db.select, db.update) in route handlers",
+          "passed": true,
+          "evidence": "routes.ts imports directly from the database layer: import { eq, and, desc } from 'drizzle-orm'; import { db } from '../../db'; import { subscriptions, invoices, users } from '../../db/schema'; Per the dependency rule, routes.ts must never import from drizzle-orm or ../../db/schema."
+        },
+        {
+          "text": "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)",
+          "passed": true,
+          "evidence": "Priority 1 (Critical): Create BillingService \u0432\u0402\u201d extract all use-case logic out of route handlers. Priority 2 (Critical): Create BillingRepository \u0432\u0402\u201d extract all Drizzle queries into one class. Also includes a full code sample for BillingService class and BillingRepository interface."
+        },
+        {
+          "text": "Notes the missing composition root / dependency injection",
+          "passed": true,
+          "evidence": "Infrastructure clients belong in the infrastructure layer, constructed by the Container (composition root), not hardcoded in the presentation layer. The service.ts code sample shows: constructor(private repo: BillingRepository, private stripe: StripeClient, private secrets: SecretsProvider) and the refactored route uses await getContext(app.container, req)."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 66.6,
+        "tokens": 7098,
+        "tool_calls": 5,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that the domain layer (NotificationService.ts) imports from infrastructure (db or drizzle-orm)",
+          "passed": true,
+          "evidence": "Critical Issue #1 heading: 'Domain Layer Directly Imports Infrastructure (Drizzle + DB Connection)' with quoted imports: \"import { eq, and } from 'drizzle-orm'; import { db } from '../../../db'; import { notifications } from '../../../db/schema';\""
+        },
+        {
+          "text": "Names the dependency rule violation explicitly \u0432\u0402\u201d domain should have zero external dependencies",
+          "passed": true,
+          "evidence": "\"In a properly layered architecture (Onion / Clean / Hexagonal), the domain layer must have zero knowledge of how data is persisted. It should define interfaces (ports) that infrastructure implementations fulfill.\""
+        },
+        {
+          "text": "Suggests introducing a repository interface in the domain layer",
+          "passed": true,
+          "evidence": "Fix section shows: \"// domain/INotificationRepository.ts\\nexport interface INotificationRepository { findUnreadByUser(userId: string): Promise<Notification[]>; ... }\" and recommended structure includes 'INotificationRepository.ts # Port (interface)' under domain/"
+        },
+        {
+          "text": "Suggests moving Drizzle logic to a separate repository/infrastructure file",
+          "passed": true,
+          "evidence": "Fix section shows: \"// infrastructure/DrizzleNotificationRepository.ts\\nimport { eq, and } from 'drizzle-orm'; ... export class DrizzleNotificationRepository implements INotificationRepository { // ... all Drizzle queries live here }\""
+        },
+        {
+          "text": "Notes that routes.ts instantiates the service directly rather than using a composition root",
+          "passed": true,
+          "evidence": "Moderate Issue #3: 'Module-Level Singleton Service in Routes' \u0432\u0402\u201d \"NotificationService is instantiated as a module-level singleton with no way to inject dependencies (because the current implementation takes no constructor arguments).\""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 74.8,
+        "tokens": 5891,
+        "tool_calls": 6,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface",
+          "passed": true,
+          "evidence": "Finding 5 states: 'There is no interface/port separating AnalyticsService from AnalyticsRepository. The service imports the concrete class directly: import { AnalyticsRepository } from \"./repository\";' and 'application depends on infrastructure rather than infrastructure depending on application.'"
+        },
+        {
+          "text": "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)",
+          "passed": true,
+          "evidence": "Finding 2 explicitly shows the constructor code 'this.repo = new AnalyticsRepository();' and states: 'AnalyticsService instantiates AnalyticsRepository directly inside its constructor. This is constructor-side coupling: the service controls its own infrastructure dependency, making it impossible to swap implementations, mock the repository in unit tests, or apply dependency injection at the composition root.'"
+        },
+        {
+          "text": "Identifies that routes.ts imports AnalyticsRepository directly (presentation \u2192 infrastructure violation)",
+          "passed": true,
+          "evidence": "Finding 3 shows 'const repo = new AnalyticsRepository();' in routes.ts and states 'The route factory creates its own service and repository instances.' The Layer Dependency Summary table explicitly flags 'routes.ts \u2192 AnalyticsRepository' as 'Routes \u2192 Infrastructure (skip application) | YES'."
+        },
+        {
+          "text": "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer",
+          "passed": true,
+          "evidence": "Finding 1 (CRITICAL) explicitly identifies: 'The /analytics/live route imports the Drizzle db singleton and the pageViews schema table directly and executes a raw query... const rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);' and states 'This violates the fundamental onion rule that outer layers may only call inward through defined ports.'"
+        },
+        {
+          "text": "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer",
+          "passed": true,
+          "evidence": "Finding 2 Fix section recommends: '// domain/ports.ts export interface IAnalyticsRepository { ... }' and Finding 5 Fix section states: 'Define IAnalyticsRepository in domain/ports.ts (or application/ports.ts) and have AnalyticsRepository implement it.' Remediation step 4 also lists: 'Extract IAnalyticsRepository port. Inject into AnalyticsService via constructor.'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 72.4,
+        "tokens": 6041,
+        "tool_calls": 3,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies the fat controller / missing service layer anti-pattern",
+          "passed": true,
+          "evidence": "The billing module is implemented as a single 'fat controller' \u0432\u0402\u201d all business logic, data access, and external API orchestration lives directly inside Fastify route handlers. [...] ### 1. No Service or Domain Layer (Critical)"
+        },
+        {
+          "text": "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers",
+          "passed": true,
+          "evidence": "A `BillingService` (or equivalent application-layer class) that owns orchestration logic such as 'create or retrieve Stripe customer, create subscription, persist record.' [...] Any change to subscription creation logic (e.g., adding trial periods, applying coupons) requires touching route-handler code, which should be concerned only with HTTP concerns (parsing, validation, response shaping)."
+        },
+        {
+          "text": "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer",
+          "passed": true,
+          "evidence": "Every route handler directly imports and calls `stripe.*` and `db.*`. There is no intermediate layer that encapsulates business logic. [...] ### 2. Stripe Client Instantiated as a Module-Level Singleton (High) [...] Makes it impossible to inject a mock Stripe client in tests \u0432\u0402\u201d there is no seam."
+        },
+        {
+          "text": "Flags direct DB queries (db.select, db.update) in route handlers",
+          "passed": true,
+          "evidence": "Every route handler directly imports and calls `stripe.*` and `db.*`. [...] A repository or data-access layer that wraps the Drizzle queries so they can be swapped or mocked in tests. [...] await db.update(subscriptions).set({ status: 'cancelled', ... }).where(...); const [user] = await db.select().from(users).where(eq(users.id, userId));"
+        },
+        {
+          "text": "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)",
+          "passed": true,
+          "evidence": "Extract a `BillingRepository` \u0432\u0402\u201d owns all Drizzle queries for `subscriptions` and `invoices`. Returns typed domain objects, not raw DB rows. Create a `BillingService` \u0432\u0402\u201d orchestrates adapter + repository calls. Contains all business logic (create-or-get-customer, cancel-with-status-update, etc.)."
+        },
+        {
+          "text": "Notes the missing composition root / dependency injection",
+          "passed": true,
+          "evidence": "The Stripe client is instantiated at module load time using `process.env` directly. [...] Makes it impossible to inject a mock Stripe client in tests \u0432\u0402\u201d there is no seam. [...] Instantiate the Stripe client inside a `StripeAdapter` class that accepts the key via constructor injection (from `SecretsProvider`). Register it as a Fastify plugin/decorator so it can be overridden in tests."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 93.7667,
+        "stddev": 7.8424,
+        "min": 88.7,
+        "max": 102.8
+      },
+      "tokens": {
+        "mean": 8993.3333,
+        "stddev": 763.4437,
+        "min": 8388,
+        "max": 9851
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 71.2667,
+        "stddev": 4.2158,
+        "min": 66.6,
+        "max": 74.8
+      },
+      "tokens": {
+        "mean": 6343.3333,
+        "stddev": 657.8498,
+        "min": 5891,
+        "max": 7098
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.00",
+      "time_seconds": "+22.5",
+      "tokens": "+2650"
+    }
+  },
+  "notes": []
+}

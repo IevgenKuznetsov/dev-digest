@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that two separate AnalyticsRepository instances are created (one inside AnalyticsService constructor, one directly in routes.ts) as a direct consequence of bypassing DI",
+      "passed": true,
+      "evidence": "Issue 2 states: 'Two separate `AnalyticsRepository` instances are created per request lifecycle, doubling connection overhead.' Issue 3 shows both locations: service.ts constructor `this.repo = new AnalyticsRepository()` and routes.ts `const repo = new AnalyticsRepository()`, framing them as a direct consequence of no DI seam."
+    },
+    {
+      "text": "Flags that getDashboardStats in repository.ts contains business logic (bounce rate calculation, top-page ranking, aggregation) that belongs in the application or domain layer — not the infrastructure layer",
+      "passed": true,
+      "evidence": "Issue 4 (HIGH) explicitly identifies `getDashboardStats()` and lists: 'Bounce rate calculation (lines 31–34)', '`avgDurationMs` (lines 27–29)', '`topPages` ranking and slicing (lines 36–45)', '`uniqueSessions` / `uniqueUsers` using in-memory `Set`s (lines 25–26)' and concludes 'This is domain/application logic sitting inside the persistence layer. Repositories should map rows to domain objects — business rules belong in the service or domain layer.'"
+    },
+    {
+      "text": "Recommends constructor injection pattern explicitly: the service should receive the port interface as a constructor parameter, not self-instantiate",
+      "passed": true,
+      "evidence": "Issue 3 Fix states: 'Accept it as a constructor parameter in `AnalyticsService`.' The review explicitly calls out that the constructor hardcodes `new AnalyticsRepository()` and recommends replacing it with constructor injection."
+    },
+    {
+      "text": "Names the port interface that should be introduced (e.g. IAnalyticsRepository or AnalyticsPort or AnalyticsRepositoryPort) and specifies it belongs in the domain layer",
+      "passed": true,
+      "evidence": "Issue 3 Fix states: 'Define an `IAnalyticsRepository` interface (port) in `domain/types.ts` or a dedicated `domain/ports.ts`.' Both the interface name `IAnalyticsRepository` and its placement in the domain layer are explicitly named."
+    },
+    {
+      "text": "Calls out the /analytics/live raw db query as a distinct, additional violation — separate from the route importing the concrete repository class",
+      "passed": true,
+      "evidence": "Issue 1 (CRITICAL) is entirely dedicated to `/analytics/live` inline DB query: 'The `/analytics/live` route imports `db`, `pageViews`, and `desc` from Drizzle and executes a raw query inline inside the route handler.' This is a separate numbered issue from Issue 2 which covers the direct repository call on `/analytics/recent`."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 6,
+    "errors_encountered": 0,
+    "output_chars": 6827,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 85.5,
+    "total_duration_seconds": 85.5
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

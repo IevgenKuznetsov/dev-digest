@@ -1,0 +1,328 @@
+{
+  "metadata": {
+    "skill_name": "onion-architecture",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-08-19T11:53:21Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 82.5,
+        "tokens": 7841,
+        "tool_calls": 11,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Uses the term 'port' or 'repository interface' (not just 'interface') when prescribing the fix \u0432\u0402\u201d and specifies it belongs in the domain layer",
+          "passed": true,
+          "evidence": "Violation 2 heading reads 'Missing Port \u0432\u0402\u201d No Repository Interface in the Domain'. The body states: 'the domain layer defines *what* it needs from persistence as an interface (a **port**), and the infrastructure layer provides the concrete implementation (an **adapter**).' The fix is prescribed as creating `domain/ports.ts` with a `NotificationRepository` interface."
+        },
+        {
+          "text": "Identifies that NotificationService has zero domain logic \u0432\u0402\u201d it is entirely Drizzle persistence code misplaced in the domain folder",
+          "passed": true,
+          "evidence": "Violation 1 states: 'There is no domain logic in this file at all. Every method is a raw Drizzle query' and lists all six methods as 'pure persistence'. Concludes: 'What is named `NotificationService` is, in substance, a **Drizzle repository** \u0432\u0402\u201d it belongs in the infrastructure layer, not the domain layer.'"
+        },
+        {
+          "text": "Names what the correct infrastructure file should be (e.g. repository.ts or infrastructure/NotificationRepository.ts) as the destination for the Drizzle code",
+          "passed": true,
+          "evidence": "Layer 3 section names the destination file explicitly: '`infrastructure/repository.ts` \u0432\u0402\u201d `DrizzleNotificationRepository` class' and provides a full class skeleton showing `export class DrizzleNotificationRepository implements NotificationRepository`."
+        },
+        {
+          "text": "Distinguishes the three layers that need to exist: domain (port/interface), application (service/use-cases), infrastructure (Drizzle repo) \u0432\u0402\u201d not just 'move the DB code'",
+          "passed": true,
+          "evidence": "The 'Required Remediation: Three-Layer Split' section explicitly names and describes all three: 'Layer 1 \u0432\u0402\u201d Domain (`modules/notification/domain/`)' for entities and ports, 'Layer 2 \u0432\u0402\u201d Application (`modules/notification/service.ts`)' for the service/use-case class, and 'Layer 3 \u0432\u0402\u201d Infrastructure (`modules/notification/infrastructure/repository.ts`)' for Drizzle queries."
+        },
+        {
+          "text": "Notes that routes.ts instantiates the service with `new` at module scope and explains this bypasses the composition root / DI wiring",
+          "passed": true,
+          "evidence": "Violation 3 quotes `const service = new NotificationService();` from `routes.ts` line 5 and states: 'The composition root in this project is `platform/container.ts`. It is the **only** file that is permitted to construct concrete implementations... By calling `new NotificationService()` in `routes.ts`, the routes file becomes its own mini-composition root. This breaks the pattern in two ways: 1. There is now no single place to swap the implementation... 2. The constructed object is a module-level singleton whose lifecycle is tied to module load time, not to the application's startup sequence.'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 94.0,
+        "tokens": 8721,
+        "tool_calls": 13,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that two separate AnalyticsRepository instances are created (one inside AnalyticsService constructor, one directly in routes.ts) as a direct consequence of bypassing DI",
+          "passed": true,
+          "evidence": "At runtime, `analyticsRoutes` creates **two separate `AnalyticsRepository` instances**: one inside `new AnalyticsService()` (which itself calls `new AnalyticsRepository()` in its constructor), and a second one created directly on the next line in the route file."
+        },
+        {
+          "text": "Flags that getDashboardStats in repository.ts contains business logic (bounce rate calculation, top-page ranking, aggregation) that belongs in the application or domain layer \u0432\u0402\u201d not the infrastructure layer",
+          "passed": true,
+          "evidence": "Computes bounce rate via session page-count logic (domain rule \u0432\u0402\u201d what is a 'bounce'?) / Sorts and slices top-10 pages (presentation shaping) / This is four responsibilities collapsed into one infrastructure method. The 'bounce' definition (a session with exactly one page view) is a business rule."
+        },
+        {
+          "text": "Recommends constructor injection pattern explicitly: the service should receive the port interface as a constructor parameter, not self-instantiate",
+          "passed": true,
+          "evidence": "The correct pattern: `export class AnalyticsService { constructor(private readonly repo: IAnalyticsRepository) {} }` \u0432\u0402\u201d The repository is injected via the constructor parameter. The type is the interface (`IAnalyticsRepository`), not the concrete class."
+        },
+        {
+          "text": "Names the port interface that should be introduced (e.g. IAnalyticsRepository or AnalyticsPort or AnalyticsRepositoryPort) and specifies it belongs in the domain layer",
+          "passed": true,
+          "evidence": "**File:** `modules/analytics/domain/ports.ts` \u0432\u0402\u201d `export interface IAnalyticsRepository { ... }` / Per the onion architecture dependency rule, inner layers define interfaces; outer layers implement them. The domain layer (`domain/`) must define what it needs."
+        },
+        {
+          "text": "Calls out the /analytics/live raw db query as a distinct, additional violation \u0432\u0402\u201d separate from the route importing the concrete repository class",
+          "passed": true,
+          "evidence": "**Violation 5: /analytics/live Route \u0432\u0402\u201d Direct Database Access in Presentation Layer** / **This is a distinct violation from /analytics/recent.** / The `/analytics/live` route goes further: it bypasses **both** the service **and** the repository. It imports `db` and `pageViews` from infrastructure packages directly into the route file."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 121.2,
+        "tokens": 14439,
+        "tool_calls": 11,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies the partial-failure / atomicity risk in /billing/cancel: stripe.subscriptions.cancel() is called before the DB update, so a DB failure after the Stripe call leaves state inconsistent with no rollback",
+          "passed": true,
+          "evidence": "Issue 1 \u0432\u0402\u201d /billing/cancel: No Compensation for Partial Failure [CRITICAL]: 'Stripe's API is called first and succeeds. The subscription is now cancelled in Stripe's system. If the subsequent DB update throws... the handler propagates an unhandled exception... The local DB record is now permanently out of sync with Stripe's truth. There is no compensation mechanism.'"
+        },
+        {
+          "text": "Notes that the Stripe client is instantiated at module scope bypassing a secrets/config abstraction \u0432\u0402\u201d it lacks an injection seam for testing and violates the adapter pattern",
+          "passed": true,
+          "evidence": "Issue 2 \u0432\u0402\u201d Stripe Client at Module Scope: Injection Seam Problem [HIGH]: 'const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, ...) \u0432\u0402\u201d module-level singleton... Untestable in isolation. Every test that imports this route file will attempt to instantiate a real Stripe client. There is no seam to swap in a mock... Hidden coupling to process.env. The rest of the codebase routes all secrets through SecretsProvider... This module breaks that convention.'"
+        },
+        {
+          "text": "Identifies that the webhook handler embeds at least 3 distinct business event handlers (subscription updated, subscription deleted, invoice.payment_failed) inline rather than delegating to separate use cases or handlers",
+          "passed": true,
+          "evidence": "Issue 3 \u0432\u0402\u201d Webhook Handler: Three Business Events, Wrong Structure [HIGH]: 'The webhook handler (lines 137-183) handles three distinct event types in a single route handler: customer.subscription.updated, customer.subscription.deleted, invoice.payment_failed. Three separate use cases are merged... No event routing abstraction.'"
+        },
+        {
+          "text": "Recommends a StripeAdapter or StripePort (port/adapter pair) as the correct abstraction \u0432\u0402\u201d not just 'inject the Stripe client'",
+          "passed": true,
+          "evidence": "Issue 4 \u0432\u0402\u201d Correct Port/Adapter Abstraction for Stripe [MEDIUM]: ''Just inject the Stripe client' is an incomplete fix... The correct abstraction is a domain-defined port (PaymentProvider interface)... The StripePaymentProvider adapter (infrastructure layer) translates between the domain vocabulary and Stripe's API.' Issue 2 also defines PaymentProvider interface with StripePaymentProvider adapter."
+        },
+        {
+          "text": "Notes that GET /billing/invoices has a write side effect (upsert into DB) making it non-idempotent and violating HTTP GET semantics \u0432\u0402\u201d and that this decision logic belongs in a use case, not a route",
+          "passed": true,
+          "evidence": "Issue 5 \u0432\u0402\u201d /billing/invoices GET: HTTP Contract Violation [HIGH]: 'HTTP contract violation: GET must be safe and idempotent. RFC 9110 Section 9.2 defines safe methods as those that do not have any side effects on the server. A GET request that performs a database write violates this contract.' Fix recommends separating concerns: 'Invoices should be synced to the DB by the webhook handler... or by an explicit background sync job.'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6,
+        "passed": 3,
+        "failed": 2,
+        "total": 5,
+        "time_seconds": 89.8,
+        "tokens": 8741,
+        "tool_calls": 4,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Uses the term 'port' or 'repository interface' (not just 'interface') when prescribing the fix \u0432\u0402\u201d and specifies it belongs in the domain layer",
+          "passed": true,
+          "evidence": "Finding 1 lists 'modules/notification/domain/INotificationRepository.ts \u0432\u0402\u201d repository port interface' and the remediation plan step 1 says 'Create modules/notification/domain/INotificationRepository.ts'. The term 'repository port interface' appears explicitly and the domain layer location is specified."
+        },
+        {
+          "text": "Identifies that NotificationService has zero domain logic \u0432\u0402\u201d it is entirely Drizzle persistence code misplaced in the domain folder",
+          "passed": true,
+          "evidence": "Finding 2 states: 'Every method in NotificationService is a direct database operation: select, insert, update, delete. There is no business logic \u0432\u0402\u201d no invariants enforced, no domain events raised, no rules about when a notification can be deleted or what constitutes a valid notification.' The summary table row 2 reads: '\"Service\" is actually a repository with no domain logic'."
+        },
+        {
+          "text": "Names what the correct infrastructure file should be (e.g. repository.ts or infrastructure/NotificationRepository.ts) as the destination for the Drizzle code",
+          "passed": true,
+          "evidence": "Finding 1 lists 'modules/notification/infrastructure/DrizzleNotificationRepository.ts \u0432\u0402\u201d concrete adapter' as a file that 'should exist but does not'. Remediation Plan Priority 1 step 2 repeats: 'Create modules/notification/infrastructure/DrizzleNotificationRepository.ts implementing INotificationRepository with all current Drizzle logic.'"
+        },
+        {
+          "text": "Distinguishes the three layers that need to exist: domain (port/interface), application (service/use-cases), infrastructure (Drizzle repo) \u0432\u0402\u201d not just 'move the DB code'",
+          "passed": false,
+          "evidence": "The review clearly distinguishes the domain layer (INotificationRepository interface) and infrastructure layer (DrizzleNotificationRepository). However, the application layer is only mentioned tangentially: 'or this collapses into an application-layer use case' and the remediation plan rewrites NotificationService to use the repository interface but does not explicitly establish a distinct application layer as a required artifact. The architecture background diagram shows '[Application Services]' but the three layers as a required triad to create are not enumerated. The review treats this as a two-step fix (domain interface + infrastructure repo) rather than a three-layer reorganization."
+        },
+        {
+          "text": "Notes that routes.ts instantiates the service with `new` at module scope and explains this bypasses the composition root / DI wiring",
+          "passed": false,
+          "evidence": "Finding 4 correctly identifies 'const service = new NotificationService()' at module scope and explains it makes 'dependency injection impossible'. The fix references 'Register the concrete implementation at the module registration site in server/src/modules/index.ts'. However, the review never uses the term 'composition root' \u0432\u0402\u201d it says 'module registration site' instead. The expectation specifically requires explaining that this bypasses the composition root / DI wiring by name."
+        }
+      ],
+      "notes": [
+        "Expectation 4 is borderline: the review's architecture diagram labels the middle ring 'Application Services' and the rewritten NotificationService implicitly becomes an application service, but the three-layer split is not explicitly enumerated as three required artifacts to create.",
+        "Expectation 5: 'module registration site' vs 'composition root' \u0432\u0402\u201d graded as failed because the specific term is absent, but the concept is partially present."
+      ]
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 85.5,
+        "tokens": 6827,
+        "tool_calls": 6,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that two separate AnalyticsRepository instances are created (one inside AnalyticsService constructor, one directly in routes.ts) as a direct consequence of bypassing DI",
+          "passed": true,
+          "evidence": "Issue 2 states: 'Two separate `AnalyticsRepository` instances are created per request lifecycle, doubling connection overhead.' Issue 3 shows both locations: service.ts constructor `this.repo = new AnalyticsRepository()` and routes.ts `const repo = new AnalyticsRepository()`, framing them as a direct consequence of no DI seam."
+        },
+        {
+          "text": "Flags that getDashboardStats in repository.ts contains business logic (bounce rate calculation, top-page ranking, aggregation) that belongs in the application or domain layer \u0432\u0402\u201d not the infrastructure layer",
+          "passed": true,
+          "evidence": "Issue 4 (HIGH) explicitly identifies `getDashboardStats()` and lists: 'Bounce rate calculation (lines 31\u0432\u0402\u201c34)', '`avgDurationMs` (lines 27\u0432\u0402\u201c29)', '`topPages` ranking and slicing (lines 36\u0432\u0402\u201c45)', '`uniqueSessions` / `uniqueUsers` using in-memory `Set`s (lines 25\u0432\u0402\u201c26)' and concludes 'This is domain/application logic sitting inside the persistence layer. Repositories should map rows to domain objects \u0432\u0402\u201d business rules belong in the service or domain layer.'"
+        },
+        {
+          "text": "Recommends constructor injection pattern explicitly: the service should receive the port interface as a constructor parameter, not self-instantiate",
+          "passed": true,
+          "evidence": "Issue 3 Fix states: 'Accept it as a constructor parameter in `AnalyticsService`.' The review explicitly calls out that the constructor hardcodes `new AnalyticsRepository()` and recommends replacing it with constructor injection."
+        },
+        {
+          "text": "Names the port interface that should be introduced (e.g. IAnalyticsRepository or AnalyticsPort or AnalyticsRepositoryPort) and specifies it belongs in the domain layer",
+          "passed": true,
+          "evidence": "Issue 3 Fix states: 'Define an `IAnalyticsRepository` interface (port) in `domain/types.ts` or a dedicated `domain/ports.ts`.' Both the interface name `IAnalyticsRepository` and its placement in the domain layer are explicitly named."
+        },
+        {
+          "text": "Calls out the /analytics/live raw db query as a distinct, additional violation \u0432\u0402\u201d separate from the route importing the concrete repository class",
+          "passed": true,
+          "evidence": "Issue 1 (CRITICAL) is entirely dedicated to `/analytics/live` inline DB query: 'The `/analytics/live` route imports `db`, `pageViews`, and `desc` from Drizzle and executes a raw query inline inside the route handler.' This is a separate numbered issue from Issue 2 which covers the direct repository call on `/analytics/recent`."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 111.2,
+        "tokens": 9447,
+        "tool_calls": 3,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies the partial-failure / atomicity risk in /billing/cancel: stripe.subscriptions.cancel() is called before the DB update, so a DB failure after the Stripe call leaves state inconsistent with no rollback",
+          "passed": true,
+          "evidence": "CRITICAL-3: 'Cancel: Stripe Cancels but DB Update Can Fail \u0432\u0402\u201d Divergence' \u0432\u0402\u201d 'Stripe reports the subscription cancelled; if the DB update throws, the local record still shows active. The user cannot re-subscribe (Stripe rejects), UI shows active, and support has no automated path to detect it.'"
+        },
+        {
+          "text": "Notes that the Stripe client is instantiated at module scope bypassing a secrets/config abstraction \u0432\u0402\u201d it lacks an injection seam for testing and violates the adapter pattern",
+          "passed": true,
+          "evidence": "CRITICAL-1: 'this module-level singleton is untestable \u0432\u0402\u201d tests cannot inject a mock client' and MEDIUM-1: 'Every handler directly imports db and instantiates stripe at module scope. There are no service interfaces, no repository abstractions, no dependency injection seams.' The fix also mentions: 'Inject the client via Fastify decorate or dependency injection so tests can substitute a mock.'"
+        },
+        {
+          "text": "Identifies that the webhook handler embeds at least 3 distinct business event handlers (subscription updated, subscription deleted, invoice.payment_failed) inline rather than delegating to separate use cases or handlers",
+          "passed": true,
+          "evidence": "MEDIUM-4 code snippet shows: 'if (event.type === \"customer.subscription.updated\") { ... } if (event.type === \"customer.subscription.deleted\") { ... } if (event.type === \"invoice.payment_failed\") { ... }' and recommends: 'Use a structured switch/dispatch table instead of sequential if blocks for clarity and exhaustiveness.'"
+        },
+        {
+          "text": "Recommends a StripeAdapter or StripePort (port/adapter pair) as the correct abstraction \u0432\u0402\u201d not just 'inject the Stripe client'",
+          "passed": false,
+          "evidence": "The review recommends injecting the Stripe client via Fastify decorate or dependency injection and extracting a BillingService/BillingRepository, but never specifically recommends a StripeAdapter, StripePort, or a port/adapter pair as the correct abstraction. The Target Architecture shows 'StripeClient (external API adapter: injectable, mockable)' as a layer label but does not prescribe a StripeAdapter or StripePort interface pattern."
+        },
+        {
+          "text": "Notes that GET /billing/invoices has a write side effect (upsert into DB) making it non-idempotent and violating HTTP GET semantics \u0432\u0402\u201d and that this decision logic belongs in a use case, not a route",
+          "passed": true,
+          "evidence": "HIGH-3: 'This GET handler writes to the database. This violates HTTP semantics (GET must be safe and idempotent).' Fix: 'Move the sync logic to an explicit POST /billing/invoices/sync or a background job triggered by webhooks.' The review also recommends extracting a BillingService (MEDIUM-1) so the decision logic moves out of the route, and P1 item 5 states 'Fix GET /billing/invoices to be read-only. Move sync logic out of the GET handler.'"
+        }
+      ],
+      "notes": [
+        "Expectation 4 (StripeAdapter/StripePort): The review mentions 'StripeClient (external API adapter: injectable, mockable)' in the Target Architecture diagram but does not use the term StripeAdapter or StripePort, and does not describe a formal port/adapter pair pattern. A lenient grader might give partial credit; strict grading marks this failed."
+      ]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 99.2333,
+        "stddev": 19.8737,
+        "min": 82.5,
+        "max": 121.2
+      },
+      "tokens": {
+        "mean": 10333.6667,
+        "stddev": 3582.4463,
+        "min": 7841,
+        "max": 14439
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.8,
+        "stddev": 0.2,
+        "min": 0.6,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 95.5,
+        "stddev": 13.7655,
+        "min": 85.5,
+        "max": 111.2
+      },
+      "tokens": {
+        "mean": 8338.3333,
+        "stddev": 1355.6199,
+        "min": 6827,
+        "max": 9447
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.20",
+      "time_seconds": "+3.7",
+      "tokens": "+1995"
+    }
+  },
+  "notes": []
+}
