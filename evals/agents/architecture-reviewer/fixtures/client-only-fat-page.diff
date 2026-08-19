@@ -1,0 +1,25 @@
+diff --git a/client/src/app/prs/page.tsx b/client/src/app/prs/page.tsx
+index 1234567..abcdefg 100644
+--- a/client/src/app/prs/page.tsx
++++ b/client/src/app/prs/page.tsx
+@@ -1,5 +1,18 @@
++import { useState, useEffect } from "react";
+ import { PRListView } from "./_components/PRListView/PRListView.js";
+
+-export default function PRsPage() {
+-  return <PRListView />;
++export default function PRsPage() {
++  const [prs, setPrs] = useState<{ id: string; title: string }[]>([]);
++  const [loading, setLoading] = useState(false);
++
++  useEffect(() => {
++    setLoading(true);
++    fetch("/api/prs")
++      .then((r) => r.json())
++      .then((data) => setPrs(data))
++      .finally(() => setLoading(false));
++  }, []);
++
++  if (loading) return <div>Loading…</div>;
++  return <PRListView prs={prs} />;
+ }
