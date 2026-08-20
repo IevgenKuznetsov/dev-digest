@@ -5,7 +5,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, CreateEvalCaseInput } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
 import { KEY_TO_ACTION } from "./constants";
@@ -18,6 +18,7 @@ export function FindingsPanel({
   repoFullName,
   headSha,
   targetFindingId,
+  onCreateEvalCase,
 }: {
   findings: FindingRecord[];
   prId: string;
@@ -25,6 +26,8 @@ export function FindingsPanel({
   headSha?: string | null;
   /** When set, the matching FindingCard auto-expands, scrolls into view, and highlights. */
   targetFindingId?: string | null;
+  /** Called when user clicks "Turn into eval case" on a FindingCard. */
+  onCreateEvalCase?: (data: Partial<CreateEvalCaseInput>) => void;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -82,6 +85,7 @@ export function FindingsPanel({
               headSha={headSha}
               highlighted={f.id === targetFindingId}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
+              onCreateEvalCase={onCreateEvalCase}
             />
           ))
         )}

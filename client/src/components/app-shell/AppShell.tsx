@@ -3,6 +3,7 @@
    All concerns live in ./hooks; overlay open/close is local view state. */
 "use client";
 
+import "./patch-nav"; // side-effect: injects Eval Dashboard into vendor NAV
 import React from "react";
 import { AppFrame, CommandPalette, ShortcutsHelp, type Crumb } from "@devdigest/ui";
 import { useGlobalShortcuts, useShellCommands, useShellContext } from "./hooks";
