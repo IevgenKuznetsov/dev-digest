@@ -17,6 +17,7 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  fileDiffMap,
   targetFindingId,
   onCreateEvalCase,
 }: {
@@ -24,6 +25,8 @@ export function FindingsPanel({
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Pre-built path → patch map so FindingCards can populate eval-case diffs. */
+  fileDiffMap?: Map<string, string>;
   /** When set, the matching FindingCard auto-expands, scrolls into view, and highlights. */
   targetFindingId?: string | null;
   /** Called when user clicks "Turn into eval case" on a FindingCard. */
@@ -84,6 +87,7 @@ export function FindingsPanel({
               repoFullName={repoFullName}
               headSha={headSha}
               highlighted={f.id === targetFindingId}
+              fileDiff={fileDiffMap?.get(f.file)}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
               onCreateEvalCase={onCreateEvalCase}
             />

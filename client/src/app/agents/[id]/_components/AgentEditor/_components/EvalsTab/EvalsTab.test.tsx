@@ -13,6 +13,7 @@ vi.mock("@/lib/hooks/evals", () => ({
   useStartEvalBatch: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
   useAgentEvalDashboard: vi.fn(() => ({ data: undefined, isLoading: false })),
   useEvalBatches: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useEvalBatch: vi.fn(() => ({ data: undefined, isLoading: false })),
   useCreateEvalCase: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useUpdateEvalCase: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));

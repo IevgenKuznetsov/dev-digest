@@ -73,6 +73,14 @@ export default function PRDetailPage() {
     () => runs.flatMap((r) => r.findings),
     [reviews],
   );
+  // Pre-built path → patch lookup so FindingCards can populate eval-case diffs.
+  const fileDiffMap = React.useMemo(() => {
+    const m = new Map<string, string>();
+    for (const f of pr?.files ?? []) {
+      if (f.patch) m.set(f.path, f.patch);
+    }
+    return m;
+  }, [pr?.files]);
   const lethalTrifecta = allFindings.filter((f) => f.kind === "lethal_trifecta");
   const findingsCount = allFindings.length;
 
@@ -161,6 +169,7 @@ export default function PRDetailPage() {
             prCommits={pr.commits}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            fileDiffMap={fileDiffMap}
             cancelMutation={cancel}
             highlightFinding={highlightFinding}
             onOpenTrace={(id) => setParam("trace", id)}

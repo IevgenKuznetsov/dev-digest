@@ -102,4 +102,26 @@ export const s = {
     padding: "16px 0",
     textAlign: "center" as const,
   } satisfies CSSProperties,
+
+  batchProgress: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 14px",
+    borderRadius: 7,
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--accent)",
+    fontSize: 13,
+  } satisfies CSSProperties,
+
+  batchProgressText: {
+    flex: 1,
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+
+  batchProgressCount: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+    fontVariantNumeric: "tabular-nums",
+  } satisfies CSSProperties,
 } as const;

@@ -16,6 +16,7 @@ import {
   useStartEvalBatch,
   useAgentEvalDashboard,
   useEvalBatches,
+  useEvalBatch,
 } from "@/lib/hooks/evals";
 import { EvalCaseEditorModal } from "@/components/eval-case-editor";
 import { s } from "./styles";
@@ -32,10 +33,47 @@ export function EvalsTab({ agent }: { agent: Agent }) {
   const [modalMode, setModalMode] = React.useState<"create" | "edit" | null>(null);
   const [editingCase, setEditingCase] = React.useState<EvalCaseRecord | null>(null);
 
+  // Track per-case pass/fail from individual runs (overrides batch data)
+  const [singleRunResults, setSingleRunResults] = React.useState<Map<string, boolean | null>>(new Map());
+
   // Is any batch currently running/queued for this agent?
-  const batchInProgress = batches?.some(
+  const activeBatch = batches?.find(
     (b) => b.status === "queued" || b.status === "running",
-  ) ?? false;
+  ) ?? null;
+  const batchInProgress = !!activeBatch;
+
+  // Fetch the latest completed batch to get per-case pass/fail
+  const latestDoneBatch = batches?.find((b) => b.status === "done") ?? null;
+  const { data: latestBatchDetail } = useEvalBatch(latestDoneBatch?.id ?? null);
+
+  // Fetch active batch detail for progress tracking (polls while running)
+  const { data: activeBatchDetail } = useEvalBatch(activeBatch?.id ?? null);
+
+  // Build case_id → pass map from latest completed batch + single-run overrides
+  const casePassMap = React.useMemo(() => {
+    const m = new Map<string, boolean | null>();
+    if (latestBatchDetail?.runs) {
+      for (const run of latestBatchDetail.runs) {
+        m.set(run.case_id, run.pass);
+      }
+    }
+    // Single-run results override batch results
+    for (const [caseId, pass] of singleRunResults) {
+      m.set(caseId, pass);
+    }
+    return m;
+  }, [latestBatchDetail?.runs, singleRunResults]);
+
+  // Batch progress: count completed runs vs total cases
+  const batchProgress = React.useMemo(() => {
+    if (!activeBatchDetail?.runs || !cases) return null;
+    const completed = activeBatchDetail.runs.length;
+    const total = cases.length;
+    // Find the currently running case (last in runs list, or the next not yet started)
+    const finishedCaseIds = new Set(activeBatchDetail.runs.map((r) => r.case_id));
+    const currentCase = cases.find((c) => !finishedCaseIds.has(c.id));
+    return { completed, total, currentCaseName: currentCase?.name ?? null };
+  }, [activeBatchDetail?.runs, cases]);
 
   function openCreate() {
     setEditingCase(null);
@@ -66,6 +104,7 @@ export function EvalsTab({ agent }: { agent: Agent }) {
         const status = run.pass === true ? "passed" : run.pass === false ? "failed" : "error";
         if (run.pass === true) notify.success(`Run ${status}`);
         else notify.error(`Run ${status}`);
+        setSingleRunResults((prev) => new Map(prev).set(id, run.pass));
       },
       onError: () => notify.error("Run failed"),
     });
@@ -142,6 +181,22 @@ export function EvalsTab({ agent }: { agent: Agent }) {
         </Button>
       </div>
 
+      {/* Batch progress indicator */}
+      {batchInProgress && batchProgress && (
+        <div style={s.batchProgress}>
+          <Icon.RefreshCw size={14} style={{ color: "var(--accent)", animation: "ddspin 1s linear infinite" }} />
+          <span style={s.batchProgressText}>
+            Running eval {batchProgress.completed + 1}/{batchProgress.total}
+            {batchProgress.currentCaseName && (
+              <> — <strong>{batchProgress.currentCaseName}</strong></>
+            )}
+          </span>
+          <span style={s.batchProgressCount}>
+            {batchProgress.completed} of {batchProgress.total} finished
+          </span>
+        </div>
+      )}
+
       {/* Cases list */}
       {isLoading ? (
         <Skeleton height={160} />
@@ -159,8 +214,7 @@ export function EvalsTab({ agent }: { agent: Agent }) {
               : [];
             const mustFind = expectedItems.filter((e) => e.type === "must_find").length;
             const mustNotFlag = expectedItems.filter((e) => e.type === "must_not_flag").length;
-            // For now, show a static pass indicator (would need run data to show last run result)
-            const passIndicator: boolean | null = null;
+            const passIndicator = casePassMap.get(c.id) ?? null;
             return (
               <div key={c.id} style={s.caseRow(passIndicator)}>
                 <span style={s.caseName}>{c.name}</span>

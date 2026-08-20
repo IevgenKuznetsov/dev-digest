@@ -7,7 +7,7 @@
 
 import React from "react";
 import { Icon, Badge } from "@devdigest/ui";
-import type { ReviewRecord, Verdict } from "@devdigest/shared";
+import type { ReviewRecord, Verdict, CreateEvalCaseInput } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
@@ -29,21 +29,27 @@ export function ReviewRunAccordion({
   defaultOpen = false,
   repoFullName,
   headSha,
+  fileDiffMap,
   targetRunId = null,
   targetNonce = 0,
   targetFindingId = null,
+  onCreateEvalCase,
 }: {
   review: ReviewRecord;
   prId: string;
   defaultOpen?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Pre-built path → patch map so FindingCards can populate eval-case diffs. */
+  fileDiffMap?: Map<string, string>;
   /** When this matches review.run_id, the accordion opens and scrolls into view
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
   /** When set, the matching FindingCard inside this accordion highlights. */
   targetFindingId?: string | null;
+  /** Called when user clicks "Turn into eval case" on a FindingCard. */
+  onCreateEvalCase?: (data: Partial<CreateEvalCaseInput>) => void;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -155,7 +161,9 @@ export function ReviewRunAccordion({
             prId={prId}
             repoFullName={repoFullName}
             headSha={headSha}
+            fileDiffMap={fileDiffMap}
             targetFindingId={targetFindingId}
+            onCreateEvalCase={onCreateEvalCase}
           />
         </div>
       )}
