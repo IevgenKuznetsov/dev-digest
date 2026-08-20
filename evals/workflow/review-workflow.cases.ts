@@ -123,7 +123,8 @@ export const cases: WorkflowCase[] = [
     name: "vendor/shared edit request routes to server/CLAUDE.md do-not-touch rule",
     prompt:
       "Хочу змінити існуючий Zod-контракт у server/src/vendor/shared/. " +
-      "Перш ніж давати поради — звірся з правилами серверного пакету цього репо.",
+      "Перш ніж давати поради — звірся з правилами серверного пакету цього репо " +
+      "і прочитай відповідний CLAUDE-файл.",
     expectFilesRead: ["server/CLAUDE.md"],
     maxTurns: 5,
   },
