@@ -7,8 +7,18 @@ Pure review engine. No DB, no GitHub, no filesystem. Only side effect: injected 
 - [docs/](docs/) — detailed documentation
 - [specs/](specs/) — behavioral specifications
 - [INSIGHTS.md](INSIGHTS.md) — non-obvious decisions and traps
+- [insights/gotchas.md](insights/gotchas.md) — unexpected behaviors and traps (check here first on surprises)
 - [README.md](README.md) — narrative overview (pipeline diagram, public API)
 - [../docs/agent-prompts/](../docs/agent-prompts/) — prompt authoring guide and canonical agent prompts
+
+## Read When
+
+| Situation | Read first |
+|-----------|-----------|
+| Changing the review pipeline, strategy selection, or prompt assembly | [`docs/pipeline.md`](docs/pipeline.md) |
+| Adding inputs to `ReviewInput` or fields to `ReviewOutcome` | [`docs/pipeline.md`](docs/pipeline.md) |
+| Something behaves unexpectedly or produces surprising output | [`insights/gotchas.md`](insights/gotchas.md) |
+| Working with `INJECTION_GUARD`, `wrapUntrusted`, or `hardenSystemPrompt` | [`docs/pipeline.md`](docs/pipeline.md) then `prompt.ts` |
 
 ## Tech stack
 
