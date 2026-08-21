@@ -21,7 +21,7 @@ import type { FindingRecord, FindingActionKind, CreateEvalCaseInput, ExpectedOut
 import { SEV_COLOR, SEV_COLOR_FALLBACK } from "./constants";
 import { lineLabel } from "./helpers";
 import { githubBlobUrl } from "../../../../../../../lib/github-urls";
-import { extractRelevantHunks } from "../../../../../../../lib/diff-utils";
+import { extractRelevantHunks, wrapPatchWithDiffHeader } from "../../../../../../../lib/diff-utils";
 import { notify } from "../../../../../../../lib/toast";
 import { s } from "./styles";
 
@@ -153,7 +153,7 @@ export function FindingCard({
                 }
                 onCreateEvalCase?.({
                   name: f.title,
-                  input_diff: extractRelevantHunks(fileDiff, f.start_line, f.end_line),
+                  input_diff: wrapPatchWithDiffHeader(f.file, extractRelevantHunks(fileDiff, f.start_line, f.end_line)),
                   expected_output: [
                     {
                       type: accepted ? "must_find" : "must_not_flag",

@@ -94,3 +94,14 @@ export function extractRelevantHunks(
 
   return header ? `${header}\n${hunkText}` : hunkText;
 }
+
+/**
+ * Wrap a raw patch (hunk-only text from GitHub API) with standard unified diff
+ * file headers so that parseDiffToUnifiedDiff can extract the file path.
+ *
+ * If the patch already contains a `diff --git` header, returns it unchanged.
+ */
+export function wrapPatchWithDiffHeader(filePath: string, patch: string): string {
+  if (patch.startsWith('diff --git ')) return patch;
+  return `diff --git a/${filePath} b/${filePath}\n--- a/${filePath}\n+++ b/${filePath}\n${patch}`;
+}

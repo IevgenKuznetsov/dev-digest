@@ -254,7 +254,6 @@ export function EvalsTab({ agent }: { agent: Agent }) {
             const actualFindings = lastRun && Array.isArray(lastRun.actual_output)
               ? (lastRun.actual_output as unknown[]).length
               : null;
-            const expectedCount = mustFind + mustNotFlag;
             const logExpanded = expandedLogCaseId === c.id;
             return (
               <div key={c.id} style={{ marginBottom: 6 }}>
@@ -262,7 +261,7 @@ export function EvalsTab({ agent }: { agent: Agent }) {
                   <div style={s.caseNameCol}>
                     <span style={s.caseName}>{c.name}</span>
                     <span style={s.caseExpectedActual}>
-                      expected {expectedCount} finding{expectedCount !== 1 ? "s" : ""}
+                      expected {mustFind} finding{mustFind !== 1 ? "s" : ""}
                       {actualFindings != null ? `, got ${actualFindings}` : ""}
                     </span>
                   </div>
