@@ -1,6 +1,7 @@
 /* EvalsTab unit tests. */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { Agent } from "@devdigest/shared";
 import { EvalsTab } from "./EvalsTab";
@@ -37,10 +38,13 @@ const AGENT: Agent = {
 };
 
 function wrap(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <NextIntlClientProvider locale="en" messages={{ agents: { "editor.tabs.evals": "Evals" } }}>
-      {ui}
-    </NextIntlClientProvider>,
+    <QueryClientProvider client={qc}>
+      <NextIntlClientProvider locale="en" messages={{ agents: { "editor.tabs.evals": "Evals" } }}>
+        {ui}
+      </NextIntlClientProvider>
+    </QueryClientProvider>,
   );
 }
 

@@ -49,22 +49,89 @@ export const s = {
     flex: 1,
   } satisfies CSSProperties,
 
-  caseRow: (pass: boolean | null): CSSProperties => ({
+  caseRow: (pass: boolean | null, logExpanded = false): CSSProperties => ({
     display: "flex",
     alignItems: "center",
     gap: 10,
     padding: "10px 14px",
-    borderRadius: 7,
+    borderRadius: logExpanded ? "7px 7px 0 0" : 7,
     background: "var(--bg-elevated)",
     border: "1px solid var(--border)",
-    marginBottom: 6,
+    borderLeft:
+      pass === true
+        ? "3px solid var(--ok)"
+        : pass === false
+          ? "3px solid var(--crit)"
+          : "3px solid var(--border)",
     opacity: pass === null ? 0.7 : 1,
   }),
 
-  caseName: {
+  runLogPanel: {
+    margin: "0 0 0 0",
+    padding: "12px 14px",
+    background: "var(--bg-surface)",
+    border: "1px solid var(--border)",
+    borderTop: "none",
+    borderRadius: "0 0 7px 7px",
+    fontSize: 12,
+  } satisfies CSSProperties,
+
+  runLogHeader: {
+    display: "flex",
+    gap: 16,
+    marginBottom: 8,
+    color: "var(--text-muted)",
+    fontSize: 11,
+    flexWrap: "wrap" as const,
+  } satisfies CSSProperties,
+
+  runLogFindings: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 6,
+  } satisfies CSSProperties,
+
+  runLogFinding: {
+    padding: "6px 10px",
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--border)",
+    borderRadius: 5,
+    fontSize: 12,
+    lineHeight: 1.4,
+  } satisfies CSSProperties,
+
+  runLogError: {
+    padding: "8px 10px",
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--crit)",
+    borderRadius: 5,
+    fontSize: 12,
+    color: "var(--crit)",
+    whiteSpace: "pre-wrap" as const,
+  } satisfies CSSProperties,
+
+  caseNameCol: {
     flex: 1,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 2,
+  } satisfies CSSProperties,
+
+  caseName: {
     fontSize: 13,
     fontWeight: 500,
+  } satisfies CSSProperties,
+
+  caseExpectedActual: {
+    fontSize: 11,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+
+  passingCount: {
+    fontSize: 13,
+    fontWeight: 400,
+    color: "var(--text-muted)",
+    marginLeft: 6,
   } satisfies CSSProperties,
 
   passIndicator: (pass: boolean | null): CSSProperties => ({

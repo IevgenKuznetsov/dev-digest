@@ -155,8 +155,8 @@ describe('computeBatchMetrics', () => {
     const m = computeBatchMetrics([]);
     expect(m.traces_total).toBe(0);
     expect(m.traces_passed).toBe(0);
-    expect(m.recall).toBeNull();
-    expect(m.precision).toBe(1.0); // 0 findings, 0 must_find → precision = 1.0
+    expect(m.recall).toBe(1.0); // no must_find expectations → trivially 1.0
+    expect(m.precision).toBe(1.0); // 0 findings, 0 expectations → precision = 1.0
     expect(m.citation_accuracy).toBeNull();
   });
 
@@ -195,7 +195,7 @@ describe('computeBatchMetrics', () => {
     expect(m.precision).toBeCloseTo(0.5);
   });
 
-  it('sets recall to null when no must_find expectations (EDGE-8)', () => {
+  it('sets recall to 1.0 when no must_find expectations (EDGE-8)', () => {
     const cases = [
       {
         expected: [makeItem('must_not_flag', 'a.ts', 1, 5)],
@@ -205,11 +205,12 @@ describe('computeBatchMetrics', () => {
       },
     ];
     const m = computeBatchMetrics(cases);
-    expect(m.recall).toBeNull();
-    expect(m.precision).toBe(1.0); // no findings → no false positives
+    expect(m.recall).toBe(1.0); // no must_find → trivially 1.0
+    // precision: (0 + 1) / (0 + 1 + 0) = 1.0 (must_not_flag satisfied, no noise)
+    expect(m.precision).toBe(1.0);
   });
 
-  it('sets precision to null when 0 findings and there are must_find expectations', () => {
+  it('sets precision to 0 when 0 findings and there are must_find expectations', () => {
     const cases = [
       {
         expected: [makeItem('must_find', 'a.ts', 1, 5)],
@@ -219,8 +220,8 @@ describe('computeBatchMetrics', () => {
       },
     ];
     const m = computeBatchMetrics(cases);
-    // 0 total findings, but must_find expectations exist → precision = null
-    expect(m.precision).toBeNull();
+    // 0 matched, 0 satisfiedMustNotFlag / (1 must_find + 0 + 0) = 0
+    expect(m.precision).toBe(0);
     expect(m.recall).toBe(0); // 0 matched / 1 must_find
   });
 
@@ -232,5 +233,102 @@ describe('computeBatchMetrics', () => {
     ];
     const m = computeBatchMetrics(cases);
     expect(m.citation_accuracy).toBeCloseTo(0.6);
+  });
+
+  it('precision with must_not_flag satisfied', () => {
+    // 1 must_not_flag, 0 findings → satisfied
+    const cases = [
+      {
+        expected: [makeItem('must_not_flag', 'a.ts', 1, 5)],
+        actual: [],
+        pass: true,
+        citationAccuracy: null,
+      },
+    ];
+    const m = computeBatchMetrics(cases);
+    // (0 + 1) / (0 + 1 + 0) = 1.0
+    expect(m.precision).toBe(1.0);
+  });
+
+  it('precision with must_not_flag violated', () => {
+    // 1 must_not_flag, 1 finding overlapping it → violated (not satisfied)
+    const cases = [
+      {
+        expected: [makeItem('must_not_flag', 'a.ts', 1, 5)],
+        actual: [makeFinding('a.ts', 3, 8)], // overlaps → violation
+        pass: false,
+        citationAccuracy: null,
+      },
+    ];
+    const m = computeBatchMetrics(cases);
+    // satisfiedMustNotFlag=0, unmatchedFindings=0 (finding matched the must_not_flag expectation)
+    // (0 + 0) / (0 + 1 + 0) = 0.0
+    expect(m.precision).toBe(0.0);
+  });
+
+  it('precision with mixed must_find + must_not_flag + noise', () => {
+    // 1 must_find (matched), 1 must_not_flag (satisfied), 3 extra unmatched findings
+    const cases = [
+      {
+        expected: [
+          makeItem('must_find', 'a.ts', 1, 5),
+          makeItem('must_not_flag', 'b.ts', 10, 20),
+        ],
+        actual: [
+          makeFinding('a.ts', 1, 5),      // matches must_find
+          makeFinding('c.ts', 1, 5),      // unmatched (noise)
+          makeFinding('c.ts', 10, 15),    // unmatched (noise)
+          makeFinding('c.ts', 20, 25),    // unmatched (noise)
+        ],
+        pass: false,
+        citationAccuracy: 1.0,
+      },
+    ];
+    const m = computeBatchMetrics(cases);
+    // matchedMustFind=1, satisfiedMustNotFlag=1, totalMustFind=1, totalMustNotFlag=1, unmatchedFindings=3
+    // (1 + 1) / (1 + 1 + 3) = 2/5 = 0.4
+    expect(m.precision).toBeCloseTo(0.4);
+  });
+
+  it('precision with only must_not_flag, all satisfied', () => {
+    // 0 must_find, 2 must_not_flag both silent, 0 findings
+    const cases = [
+      {
+        expected: [
+          makeItem('must_not_flag', 'a.ts', 1, 5),
+          makeItem('must_not_flag', 'b.ts', 10, 20),
+        ],
+        actual: [],
+        pass: true,
+        citationAccuracy: null,
+      },
+    ];
+    const m = computeBatchMetrics(cases);
+    // (0 + 2) / (0 + 2 + 0) = 1.0
+    expect(m.precision).toBe(1.0);
+    expect(m.recall).toBe(1.0);
+  });
+
+  it('precision with only must_not_flag, one violated', () => {
+    // 0 must_find, 2 must_not_flag (1 silent, 1 flagged), 0 extra findings
+    const cases = [
+      {
+        expected: [
+          makeItem('must_not_flag', 'a.ts', 1, 5),   // silent → satisfied
+          makeItem('must_not_flag', 'b.ts', 10, 20), // overlapping finding → violated
+        ],
+        actual: [
+          makeFinding('b.ts', 12, 18), // overlaps b.ts 10-20
+        ],
+        pass: false,
+        citationAccuracy: null,
+      },
+    ];
+    const m = computeBatchMetrics(cases);
+    // satisfiedMustNotFlag=1 (a.ts silent), violated=1 (b.ts flagged)
+    // unmatchedFindings=0 (b.ts finding matched the must_not_flag expectation)
+    // (0 + 1) / (0 + 2 + 0) = 0.5
+    expect(m.precision).toBeCloseTo(0.5);
+    expect(m.recall).toBe(1.0);
   });
 });

@@ -127,7 +127,7 @@ export function useEvalBatch(batchId: string | null | undefined) {
     },
   });
 
-  // Toast on completion (AC-E8)
+  // Toast on completion (AC-E8) + invalidate dependent queries
   const prevStatus = React.useRef<string | undefined>(undefined);
   React.useEffect(() => {
     const status = data?.status;
@@ -140,10 +140,17 @@ export function useEvalBatch(batchId: string | null | undefined) {
       const passed = data?.runs?.filter((r) => r.pass === true).length ?? 0;
       const total = data?.runs?.length ?? 0;
       notify.success(`Eval batch completed: ${passed}/${total} passed`);
+      // Refresh batch list + dashboard so per-case pass/fail updates
+      qc.invalidateQueries({ queryKey: ["eval-batches"] });
+      qc.invalidateQueries({ queryKey: ["agent-eval-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["eval-dashboard"] });
     } else if (status === "failed") {
       notify.error("Eval batch failed");
+      qc.invalidateQueries({ queryKey: ["eval-batches"] });
+      qc.invalidateQueries({ queryKey: ["agent-eval-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["eval-dashboard"] });
     }
-  }, [data?.status, data?.runs]);
+  }, [data?.status, data?.runs, qc]);
 
   return { data, ...rest };
 }

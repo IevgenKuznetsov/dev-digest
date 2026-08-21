@@ -5,9 +5,10 @@
 
 import React from "react";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Icon, Button, Skeleton, EmptyState } from "@devdigest/ui";
 import type { Agent } from "@devdigest/shared";
-import type { EvalCaseRecord } from "@devdigest/shared";
+import type { EvalCaseRecord, EvalBatchRunRecord } from "@devdigest/shared";
 import { notify } from "@/lib/toast";
 import {
   useEvalCases,
@@ -22,7 +23,11 @@ import { EvalCaseEditorModal } from "@/components/eval-case-editor";
 import { s } from "./styles";
 import { METRICS_LABELS } from "./constants";
 
+/** Query-cache key for persisting single-run results across navigation. */
+const singleRunCacheKey = (agentId: string) => ["eval-single-runs", agentId] as const;
+
 export function EvalsTab({ agent }: { agent: Agent }) {
+  const qc = useQueryClient();
   const { data: cases, isLoading } = useEvalCases(agent.id);
   const { data: batches } = useEvalBatches(agent.id);
   const { data: dashboard } = useAgentEvalDashboard(agent.id);
@@ -32,9 +37,15 @@ export function EvalsTab({ agent }: { agent: Agent }) {
 
   const [modalMode, setModalMode] = React.useState<"create" | "edit" | null>(null);
   const [editingCase, setEditingCase] = React.useState<EvalCaseRecord | null>(null);
+  const [expandedLogCaseId, setExpandedLogCaseId] = React.useState<string | null>(null);
 
-  // Track per-case pass/fail from individual runs (overrides batch data)
-  const [singleRunResults, setSingleRunResults] = React.useState<Map<string, boolean | null>>(new Map());
+  // Single-run results cached in query cache so they survive navigation.
+  // useQuery subscribes to cache changes so the component re-renders on updates.
+  const { data: singleRunResults = {} } = useQuery<Record<string, EvalBatchRunRecord>>({
+    queryKey: [...singleRunCacheKey(agent.id)],
+    queryFn: () => qc.getQueryData<Record<string, EvalBatchRunRecord>>(singleRunCacheKey(agent.id)) ?? {},
+    staleTime: Infinity,
+  });
 
   // Is any batch currently running/queued for this agent?
   const activeBatch = batches?.find(
@@ -43,26 +54,41 @@ export function EvalsTab({ agent }: { agent: Agent }) {
   const batchInProgress = !!activeBatch;
 
   // Fetch the latest completed batch to get per-case pass/fail
-  const latestDoneBatch = batches?.find((b) => b.status === "done") ?? null;
+  // batches are sorted ascending by ranAt, so findLast gets the most recent.
+  const latestDoneBatch = batches?.findLast((b) => b.status === "done") ?? null;
   const { data: latestBatchDetail } = useEvalBatch(latestDoneBatch?.id ?? null);
 
   // Fetch active batch detail for progress tracking (polls while running)
   const { data: activeBatchDetail } = useEvalBatch(activeBatch?.id ?? null);
 
-  // Build case_id → pass map from latest completed batch + single-run overrides
-  const casePassMap = React.useMemo(() => {
-    const m = new Map<string, boolean | null>();
+  // Build case_id → run record map. For each case the most recent run wins
+  // (by ran_at), regardless of whether it came from a batch or manual run.
+  const caseLastRunMap = React.useMemo(() => {
+    const m = new Map<string, EvalBatchRunRecord>();
+    const setIfNewer = (run: EvalBatchRunRecord) => {
+      const prev = m.get(run.case_id);
+      if (!prev || run.ran_at > prev.ran_at) m.set(run.case_id, run);
+    };
     if (latestBatchDetail?.runs) {
-      for (const run of latestBatchDetail.runs) {
-        m.set(run.case_id, run.pass);
-      }
+      for (const run of latestBatchDetail.runs) setIfNewer(run);
     }
-    // Single-run results override batch results
-    for (const [caseId, pass] of singleRunResults) {
-      m.set(caseId, pass);
+    if (activeBatchDetail?.runs) {
+      for (const run of activeBatchDetail.runs) setIfNewer(run);
+    }
+    for (const run of Object.values(singleRunResults)) {
+      setIfNewer(run);
     }
     return m;
-  }, [latestBatchDetail?.runs, singleRunResults]);
+  }, [latestBatchDetail?.runs, activeBatchDetail?.runs, singleRunResults]);
+
+  // Derive pass map from the run map
+  const casePassMap = React.useMemo(() => {
+    const m = new Map<string, boolean | null>();
+    for (const [caseId, run] of caseLastRunMap) {
+      m.set(caseId, run.pass);
+    }
+    return m;
+  }, [caseLastRunMap]);
 
   // Batch progress: count completed runs vs total cases
   const batchProgress = React.useMemo(() => {
@@ -104,7 +130,9 @@ export function EvalsTab({ agent }: { agent: Agent }) {
         const status = run.pass === true ? "passed" : run.pass === false ? "failed" : "error";
         if (run.pass === true) notify.success(`Run ${status}`);
         else notify.error(`Run ${status}`);
-        setSingleRunResults((prev) => new Map(prev).set(id, run.pass));
+        // Persist full run record in query cache so it survives navigation
+        const prev = qc.getQueryData<Record<string, EvalBatchRunRecord>>(singleRunCacheKey(agent.id)) ?? {};
+        qc.setQueryData(singleRunCacheKey(agent.id), { ...prev, [id]: run });
       },
       onError: () => notify.error("Run failed"),
     });
@@ -164,7 +192,14 @@ export function EvalsTab({ agent }: { agent: Agent }) {
 
       {/* Eval cases list header */}
       <div style={s.headerRow}>
-        <h2 style={s.h2}>Eval Cases</h2>
+        <h2 style={s.h2}>
+          Eval Cases
+          {cases && cases.length > 0 && (
+            <span style={s.passingCount}>
+              {" "}{Array.from(casePassMap.values()).filter((v) => v === true).length} | {cases.length} passing
+            </span>
+          )}
+        </h2>
         <Button
           kind="secondary"
           size="sm"
@@ -215,55 +250,83 @@ export function EvalsTab({ agent }: { agent: Agent }) {
             const mustFind = expectedItems.filter((e) => e.type === "must_find").length;
             const mustNotFlag = expectedItems.filter((e) => e.type === "must_not_flag").length;
             const passIndicator = casePassMap.get(c.id) ?? null;
+            const lastRun = caseLastRunMap.get(c.id) ?? null;
+            const actualFindings = lastRun && Array.isArray(lastRun.actual_output)
+              ? (lastRun.actual_output as unknown[]).length
+              : null;
+            const expectedCount = mustFind + mustNotFlag;
+            const logExpanded = expandedLogCaseId === c.id;
             return (
-              <div key={c.id} style={s.caseRow(passIndicator)}>
-                <span style={s.caseName}>{c.name}</span>
+              <div key={c.id} style={{ marginBottom: 6 }}>
+                <div style={s.caseRow(passIndicator, logExpanded)}>
+                  <div style={s.caseNameCol}>
+                    <span style={s.caseName}>{c.name}</span>
+                    <span style={s.caseExpectedActual}>
+                      expected {expectedCount} finding{expectedCount !== 1 ? "s" : ""}
+                      {actualFindings != null ? `, got ${actualFindings}` : ""}
+                    </span>
+                  </div>
 
-                {/* Expected output summary */}
-                <span style={s.badge}>
-                  {mustFind > 0 && `${mustFind} must_find`}
-                  {mustFind > 0 && mustNotFlag > 0 && ", "}
-                  {mustNotFlag > 0 && `${mustNotFlag} must_not_flag`}
-                  {mustFind === 0 && mustNotFlag === 0 && "no expectations"}
-                </span>
+                  {/* Expected output summary */}
+                  <span style={s.badge}>
+                    {mustFind > 0 && `${mustFind} must_find`}
+                    {mustFind > 0 && mustNotFlag > 0 && ", "}
+                    {mustNotFlag > 0 && `${mustNotFlag} must_not_flag`}
+                    {mustFind === 0 && mustNotFlag === 0 && "no expectations"}
+                  </span>
 
 
-                {/* Pass/fail indicator — icon + text (not color alone) */}
-                <span style={s.passIndicator(passIndicator)} aria-label="Last run status">
-                  {passIndicator === true && (
-                    <><Icon.CheckCircle size={13} aria-hidden="true" /><span>Pass</span></>
-                  )}
-                  {passIndicator === false && (
-                    <><Icon.XCircle size={13} aria-hidden="true" /><span>Fail</span></>
-                  )}
-                  {passIndicator === null && (
-                    <span style={{ color: "var(--text-muted)", fontSize: 11 }}>no runs</span>
-                  )}
-                </span>
+                  {/* Pass/fail indicator — icon + text (not color alone) */}
+                  <span style={s.passIndicator(passIndicator)} aria-label="Last run status">
+                    {passIndicator === true && (
+                      <><Icon.CheckCircle size={13} aria-hidden="true" /><span>Pass</span></>
+                    )}
+                    {passIndicator === false && (
+                      <><Icon.XCircle size={13} aria-hidden="true" /><span>Fail</span></>
+                    )}
+                    {passIndicator === null && (
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>no runs</span>
+                    )}
+                  </span>
 
-                {/* Actions */}
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  icon="Play"
-                  loading={runCase.isPending}
-                  onClick={() => handleRunCase(c.id)}
-                  aria-label={`Run eval case: ${c.name}`}
-                />
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  icon="Edit"
-                  onClick={() => openEdit(c)}
-                  aria-label={`Edit eval case: ${c.name}`}
-                />
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  icon="Trash"
-                  onClick={() => handleDelete(c.id, c.name)}
-                  aria-label={`Delete eval case: ${c.name}`}
-                />
+                  {/* Actions */}
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    icon="FileText"
+                    disabled={!lastRun}
+                    onClick={() => setExpandedLogCaseId(logExpanded ? null : c.id)}
+                    aria-label={`View last run log: ${c.name}`}
+                    aria-expanded={logExpanded}
+                  />
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    icon="Play"
+                    loading={runCase.isPending}
+                    onClick={() => handleRunCase(c.id)}
+                    aria-label={`Run eval case: ${c.name}`}
+                  />
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    icon="Edit"
+                    onClick={() => openEdit(c)}
+                    aria-label={`Edit eval case: ${c.name}`}
+                  />
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    icon="Trash"
+                    onClick={() => handleDelete(c.id, c.name)}
+                    aria-label={`Delete eval case: ${c.name}`}
+                  />
+                </div>
+
+                {/* Expandable run log panel */}
+                {logExpanded && lastRun && (
+                  <RunLogPanel run={lastRun} />
+                )}
               </div>
             );
           })}
@@ -279,6 +342,64 @@ export function EvalsTab({ agent }: { agent: Agent }) {
           onSaved={() => closeModal()}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RunLogPanel — inline expandable panel showing last run details
+// ---------------------------------------------------------------------------
+
+interface FindingDisplay {
+  file: string;
+  start_line: number;
+  end_line: number;
+  severity: string;
+  category: string;
+  title: string;
+  rationale: string;
+}
+
+function RunLogPanel({ run }: { run: EvalBatchRunRecord }) {
+  const findings = Array.isArray(run.actual_output) ? (run.actual_output as FindingDisplay[]) : [];
+  const ranAt = new Date(run.ran_at).toLocaleString();
+  const duration = run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—";
+  const cost = run.cost_usd != null ? `$${run.cost_usd.toFixed(4)}` : "—";
+  const sev = (v: string) => v.toUpperCase();
+
+  return (
+    <div style={s.runLogPanel}>
+      <div style={s.runLogHeader}>
+        <span>Ran: {ranAt}</span>
+        <span>Duration: {duration}</span>
+        <span>Cost: {cost}</span>
+        <span>Findings: {findings.length}</span>
+      </div>
+
+      {run.error && (
+        <div style={s.runLogError}>{run.error}</div>
+      )}
+
+      {findings.length > 0 ? (
+        <div style={s.runLogFindings}>
+          {findings.map((f, i) => (
+            <div key={i} style={s.runLogFinding}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                <span style={{ color: sev(f.severity) === "CRITICAL" ? "var(--crit)" : sev(f.severity) === "WARNING" ? "var(--warn)" : "var(--text-secondary)" }}>
+                  [{f.severity}]
+                </span>
+                {" "}{f.title}
+              </div>
+              <div style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 2 }}>
+                {f.file}:{f.start_line}–{f.end_line} / {f.category}
+              </div>
+              <div style={{ color: "var(--text-secondary)" }}>{f.rationale}</div>
+            </div>
+          ))}
+        </div>
+      ) : !run.error ? (
+        <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No findings produced</div>
+      ) : null}
     </div>
   );
 }

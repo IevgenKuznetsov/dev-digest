@@ -6,7 +6,7 @@
  * scoping is done via JOIN agents ON eval_batches.owner_id = agents.id.
  */
 
-import { and, eq, gte, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, or } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 
@@ -324,7 +324,7 @@ export class EvalRepository {
           .select()
           .from(t.evalBatches)
           .where(eq(t.evalBatches.ownerId, agent.id))
-          .orderBy(t.evalBatches.ranAt)
+          .orderBy(desc(t.evalBatches.ranAt))
           .limit(1);
 
         const cases = await this.db
@@ -360,7 +360,7 @@ export class EvalRepository {
       .from(t.evalBatches)
       .innerJoin(t.agents, eq(t.evalBatches.ownerId, t.agents.id))
       .where(eq(t.agents.workspaceId, workspaceId))
-      .orderBy(t.evalBatches.ranAt)
+      .orderBy(desc(t.evalBatches.ranAt))
       .limit(limit);
 
     return rows.map((r) => ({ ...r.batch, agentName: r.agentName }));

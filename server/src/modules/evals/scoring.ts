@@ -38,17 +38,35 @@ export function jaccardLineRange(
 }
 
 // ===========================================================================
+// Path normalization
+// ===========================================================================
+
+/**
+ * Normalize file paths for comparison: strip leading `./`, `b/`, `/`,
+ * convert backslashes to forward slashes, collapse repeated slashes.
+ */
+export function normalizePath(p: string): string {
+  return p
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/^b\//, '')
+    .replace(/^\//, '');
+}
+
+// ===========================================================================
 // Per-case scoring
 // ===========================================================================
 
 /**
  * Determine whether a single expected item is satisfied by any actual finding.
- * Overlap = same file AND line ranges intersect.
+ * Overlap = same file (after path normalization) AND line ranges intersect.
  */
 function findMatch(item: ExpectedOutputItem, actualFindings: Finding[]): Finding | undefined {
+  const expectedFile = normalizePath(item.file);
   return actualFindings.find(
     (f) =>
-      f.file === item.file &&
+      normalizePath(f.file) === expectedFile &&
       lineRangeOverlaps(
         { start: item.start_line, end: item.end_line },
         { start: f.start_line, end: f.end_line },
@@ -128,21 +146,26 @@ export interface BatchMetrics {
 /**
  * computeBatchMetrics — aggregate recall, precision, citation_accuracy, pass counts.
  *
- * Formulas from the spec:
- *   recall = (must_find expectations matched) / (total must_find expectations)
- *   precision = (actual findings that match a must_find) / (total actual findings)
+ * Formulas:
+ *   recall    = (must_find expectations matched) / (total must_find expectations)
+ *               → 1.0 when totalMustFind === 0 (no must_find expectations → trivially recalled)
+ *
+ *   precision = (matchedMustFind + satisfiedMustNotFlag)
+ *               / (totalMustFind + totalMustNotFlag + unmatchedFindings)
+ *               → 1.0 when denominator === 0 (no expectations, no findings → perfect)
+ *
  *   citation_accuracy = average of per-case citation_accuracy (non-null only)
  *
- * Division-by-zero guards:
- *   totalMustFind === 0  → recall = null (no must_find expectations → N/A)
- *   totalFindings === 0 AND only must_not_flag expectations → precision = 1.0
- *   totalFindings === 0 WITH must_find expectations → precision = null
+ * Where:
+ *   satisfiedMustNotFlag = must_not_flag expectations with NO overlapping actual finding
+ *   unmatchedFindings    = actual findings that do NOT overlap ANY expectation
  */
 export function computeBatchMetrics(cases: CaseResult[]): BatchMetrics {
   let totalMustFind = 0;
   let matchedMustFind = 0;
-  let totalActualFindings = 0;
-  let findingsMatchingMustFind = 0;
+  let totalMustNotFlag = 0;
+  let satisfiedMustNotFlag = 0;
+  let unmatchedFindings = 0;
   const citationAccuracies: number[] = [];
 
   const tracesTotal = cases.length;
@@ -161,33 +184,35 @@ export function computeBatchMetrics(cases: CaseResult[]): BatchMetrics {
       if (match) matchedMustFind++;
     }
 
-    // Precision numerator: actual findings that match ANY must_find
-    totalActualFindings += c.actual.length;
+    // --- must_not_flag ---
+    const mustNotFlags = c.expected.filter((e) => e.type === 'must_not_flag');
+    totalMustNotFlag += mustNotFlags.length;
+    for (const item of mustNotFlags) {
+      const match = findMatch(item, c.actual);
+      if (!match) satisfiedMustNotFlag++;
+    }
+
+    // --- unmatched findings ---
     for (const f of c.actual) {
-      const matchesMustFind = c.expected.some(
+      const nf = normalizePath(f.file);
+      const matchesAny = c.expected.some(
         (e) =>
-          e.type === 'must_find' &&
-          f.file === e.file &&
+          normalizePath(e.file) === nf &&
           lineRangeOverlaps(
             { start: e.start_line, end: e.end_line },
             { start: f.start_line, end: f.end_line },
           ),
       );
-      if (matchesMustFind) findingsMatchingMustFind++;
+      if (!matchesAny) unmatchedFindings++;
     }
   }
 
-  // Recall
-  const recall = totalMustFind === 0 ? null : matchedMustFind / totalMustFind;
+  // Recall: 1.0 when no must_find expectations (trivially satisfied)
+  const recall = totalMustFind === 0 ? 1.0 : matchedMustFind / totalMustFind;
 
-  // Precision
-  let precision: number | null;
-  if (totalActualFindings === 0) {
-    // No findings produced at all
-    precision = totalMustFind === 0 ? 1.0 : null;
-  } else {
-    precision = findingsMatchingMustFind / totalActualFindings;
-  }
+  // Precision: accounts for must_not_flag expectations and unmatched (noisy) findings
+  const precisionDenom = totalMustFind + totalMustNotFlag + unmatchedFindings;
+  const precision = precisionDenom === 0 ? 1.0 : (matchedMustFind + satisfiedMustNotFlag) / precisionDenom;
 
   // Citation accuracy (average of non-null per-case values)
   const citation_accuracy =
