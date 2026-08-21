@@ -1,0 +1,53 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies the partial-failure / atomicity risk in /billing/cancel: stripe.subscriptions.cancel() is called before the DB update, so a DB failure after the Stripe call leaves state inconsistent with no rollback",
+      "passed": true,
+      "evidence": "CRITICAL-3: 'Cancel: Stripe Cancels but DB Update Can Fail — Divergence' — 'Stripe reports the subscription cancelled; if the DB update throws, the local record still shows active. The user cannot re-subscribe (Stripe rejects), UI shows active, and support has no automated path to detect it.'"
+    },
+    {
+      "text": "Notes that the Stripe client is instantiated at module scope bypassing a secrets/config abstraction — it lacks an injection seam for testing and violates the adapter pattern",
+      "passed": true,
+      "evidence": "CRITICAL-1: 'this module-level singleton is untestable — tests cannot inject a mock client' and MEDIUM-1: 'Every handler directly imports db and instantiates stripe at module scope. There are no service interfaces, no repository abstractions, no dependency injection seams.' The fix also mentions: 'Inject the client via Fastify decorate or dependency injection so tests can substitute a mock.'"
+    },
+    {
+      "text": "Identifies that the webhook handler embeds at least 3 distinct business event handlers (subscription updated, subscription deleted, invoice.payment_failed) inline rather than delegating to separate use cases or handlers",
+      "passed": true,
+      "evidence": "MEDIUM-4 code snippet shows: 'if (event.type === \"customer.subscription.updated\") { ... } if (event.type === \"customer.subscription.deleted\") { ... } if (event.type === \"invoice.payment_failed\") { ... }' and recommends: 'Use a structured switch/dispatch table instead of sequential if blocks for clarity and exhaustiveness.'"
+    },
+    {
+      "text": "Recommends a StripeAdapter or StripePort (port/adapter pair) as the correct abstraction — not just 'inject the Stripe client'",
+      "passed": false,
+      "evidence": "The review recommends injecting the Stripe client via Fastify decorate or dependency injection and extracting a BillingService/BillingRepository, but never specifically recommends a StripeAdapter, StripePort, or a port/adapter pair as the correct abstraction. The Target Architecture shows 'StripeClient (external API adapter: injectable, mockable)' as a layer label but does not prescribe a StripeAdapter or StripePort interface pattern."
+    },
+    {
+      "text": "Notes that GET /billing/invoices has a write side effect (upsert into DB) making it non-idempotent and violating HTTP GET semantics — and that this decision logic belongs in a use case, not a route",
+      "passed": true,
+      "evidence": "HIGH-3: 'This GET handler writes to the database. This violates HTTP semantics (GET must be safe and idempotent).' Fix: 'Move the sync logic to an explicit POST /billing/invoices/sync or a background job triggered by webhooks.' The review also recommends extracting a BillingService (MEDIUM-1) so the decision logic moves out of the route, and P1 item 5 states 'Fix GET /billing/invoices to be read-only. Move sync logic out of the GET handler.'"
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": 0.8
+  },
+  "execution_metrics": {
+    "total_tool_calls": 3,
+    "errors_encountered": 0,
+    "output_chars": 9447,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 111.165,
+    "total_duration_seconds": 111.2
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Expectation 4 (StripeAdapter/StripePort): The review mentions 'StripeClient (external API adapter: injectable, mockable)' in the Target Architecture diagram but does not use the term StripeAdapter or StripePort, and does not describe a formal port/adapter pair pattern. A lenient grader might give partial credit; strict grading marks this failed."
+    ],
+    "workarounds": []
+  }
+}

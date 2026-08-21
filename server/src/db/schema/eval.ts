@@ -1,6 +1,8 @@
 import { pgTable, uuid, text, integer, boolean, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
+import { findings } from './reviews';
+import { agents } from './agents';
 
 // ============================================================ Eval / Conformance / Compose
 
@@ -17,6 +19,25 @@ export const evalCases = pgTable('eval_cases', {
   inputMeta: jsonb('input_meta'),
   expectedOutput: jsonb('expected_output'),
   notes: text('notes'),
+  sourceFindingId: uuid('source_finding_id').references(() => findings.id, { onDelete: 'set null' }),
+});
+
+export const evalBatches = pgTable('eval_batches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id')
+    .notNull()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  ownerKind: text('owner_kind').notNull(),
+  agentVersion: integer('agent_version').notNull(),
+  ranAt: timestamp('ran_at', { withTimezone: true }).defaultNow().notNull(),
+  status: text('status').notNull(),
+  recall: doublePrecision('recall'),
+  precision: doublePrecision('precision'),
+  citationAccuracy: doublePrecision('citation_accuracy'),
+  tracesTotal: integer('traces_total'),
+  tracesPassed: integer('traces_passed'),
+  costUsd: doublePrecision('cost_usd'),
+  durationMs: integer('duration_ms'),
 });
 
 export const evalRuns = pgTable('eval_runs', {
@@ -32,6 +53,8 @@ export const evalRuns = pgTable('eval_runs', {
   citationAccuracy: doublePrecision('citation_accuracy'),
   durationMs: integer('duration_ms'),
   costUsd: doublePrecision('cost_usd'),
+  batchId: uuid('batch_id').references(() => evalBatches.id, { onDelete: 'cascade' }),
+  error: text('error'),
 });
 
 export const conformanceChecks = pgTable('conformance_checks', {

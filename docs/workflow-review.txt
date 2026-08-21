@@ -1,0 +1,362 @@
+ RUN  v2.1.9 C:/Work/Repositories/dev-digest/evals
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > API-route task reads api-contracts AND pulls the architecture-reviewer
+
+  trace: API-route task reads api-contracts AND pulls the architecture-reviewer — ok (1 turns)
+    tools:     Read, Glob, Grep, Agent, Bash
+    subagents: architecture-reviewer
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\server\CLAUDE.md, C:\Work\Repositories\dev-digest\server, C:\Work\Repositories\dev-digest\server\src\modules\reviews\routes.ts, C:\Work\Repositories\dev-digest\server\src\modules, C:\Work\Repositories\dev-digest\server\src\modules\reviews\service.ts, C:\Work\Repositories\dev-digest\server\src\db\schema, C:\Work\Repositories\dev-digest\server\src\modules\reviews\helpers.ts, C:\Work\Repositories\dev-digest\server\src\db\schema\reviews.ts, C:\Work\Repositories\dev-digest\server\README.md, C:\Work\Repositories\dev-digest\server\src\modules\reviews\repository.ts, C:\Work\Repositories\dev-digest\server\src\modules\reviews\routes.ts, C:\Work\Repositories\dev-digest\server\src\modules\reviews\service.ts
+    metrics:   1 turns · 8822ms · 10→699 tok · 19 tool calls
+    text: Чудово! **Architecture reviewer** завершив роботу. Ось висновки:  ## 📋 Результат архітектурного ревʼю  **Вердикт: ✅ План архітектурно коректний**  ### Ключові знахідки:  1. **Жодних порушень onion-шарів**    - Routes → Service → Repository → Pure formatter    - Залежності йдуть тільки всередину (in…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > pipeline task follows CLAUDE.md routing to pipeline.md
+
+  trace: pipeline task follows CLAUDE.md routing to pipeline.md — ok (12 turns)
+    tools:     Read, Glob
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\reviewer-core\CLAUDE.md, C:\Work\Repositories\dev-digest\server\CLAUDE.md, C:\Work\Repositories\dev-digest\reviewer-core\INSIGHTS.md, C:\Work\Repositories\dev-digest\server\INSIGHTS.md, C:\Work\Repositories\dev-digest\reviewer-core\README.md, C:\Work\Repositories\dev-digest\server\README.md
+    metrics:   12 turns · 23949ms · 4044→1846 tok · 11 tool calls
+    text: Чудово. Тепер у мене є повна картина. Ось що потрібно знати про review pipeline перед змінами:  ## 📋 Документація Review Pipeline  ### **Архітектура (reviewer-core)** 1. **Трубопровід:** diff → `assemblePrompt()` → `wrapUntrusted()` + `INJECTION_GUARD` → LLM → структурований вивід → `groundFindings…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > CLAUDE.md routes a gotchas lookup to reviewer-core/insights
+
+  trace: CLAUDE.md routes a gotchas lookup to reviewer-core/insights — ok (2 turns)
+    tools:     Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\reviewer-core\INSIGHTS.md
+    metrics:   2 turns · 12831ms · 15→994 tok · 1 tool calls
+    text: Ось INSIGHTS.md для `reviewer-core`. Там зафіксовано **три непередбачувані поведінки** (станом на 2026-08-07):  ## 🎯 Ймовірні причини твоєї проблеми:  1. **`ReviewOutcome.assembly` типізація** — якщо розширюєш `PromptAssembly` новими полями через `.extend()`, потрібно оновити **обидва місця**: `pro…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > server task reads server/CLAUDE.md before exploring code
+
+  trace: server task reads server/CLAUDE.md before exploring code — ok (5 turns)
+    tools:     Read, Glob
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\server\CLAUDE.md, C:\Work\Repositories\dev-digest\server\src\modules\index.ts, C:\Work\Repositories\dev-digest\server\src\modules\settings\routes.ts
+    metrics:   5 turns · 19139ms · 596→1378 tok · 4 tool calls
+    text: Відмінно! Тепер маю чіткий контекст. Дайте я резюмую мої знахідки та запропоную архітектуру:  ## 📋 Резюме настанов серверного пакету  Прочитав `server/CLAUDE.md` та проаналізував існуючу структуру. Ось ключові настанови для push-нотифікацій модуля:  ### **Конвенції для нового модуля:**  1. **Структ…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > client task reads client/CLAUDE.md before exploring code
+
+  trace: client task reads client/CLAUDE.md before exploring code — ok (2 turns)
+    tools:     Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\client\CLAUDE.md
+    metrics:   2 turns · 10431ms · 16→758 tok · 1 tool calls
+    text: Готово! Я ознайомився з настановами для клієнтського пакету. Ось ключові правила для додавання новго React-компонента:  ## 📋 Настанови для нового компонента  **Структура:** - Компоненти живуть у `src/components/<Feature>/` - Кожен компонент має структуру:   - `Component.tsx` — основний компонент   …
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > DB migration error routes to root CLAUDE.md gotchas
+
+  trace: DB migration error routes to root CLAUDE.md gotchas — ok (2 turns)
+    tools:     Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\CLAUDE.md
+    metrics:   2 turns · 8294ms · 0→4 tok · 1 tool calls
+    text: 
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > client api.ts body-less POST gotcha routes to client/CLAUDE.md
+
+  trace: client api.ts body-less POST gotcha routes to client/CLAUDE.md — ok (6 turns)
+    tools:     Glob, Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\client\CLAUDE.md, C:\Work\Repositories\dev-digest\client\INSIGHTS.md
+    metrics:   6 turns · 12792ms · 24→873 tok · 5 tool calls
+    text: **Знайшов!** Рядок 58–59 в `client/CLAUDE.md`:  > **Gotchas** > - `api.ts` only sends `content-type: application/json` when body is present.   >   Adding it unconditionally breaks body-less POST/PUT (Fastify rejects empty JSON body).  **Проблема:** Твій клієнтський код відправляє `Content-Type: appl…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > vendor/shared edit request routes to server/CLAUDE.md do-not-touch rule
+
+  trace: vendor/shared edit request routes to server/CLAUDE.md do-not-touch rule — ok (2 turns)
+    tools:     Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\server\CLAUDE.md
+    metrics:   2 turns · 8579ms · 16→575 tok · 1 tool calls
+    text: Саме чого! Правило чітко написано:  **`vendor/shared/` — add new contract files, never edit existing ones.**  Це означає:  - ❌ **Не змінювати** існуючі Zod-контракти в `server/src/vendor/shared/` - ✅ **Можна тільки додавати** нові файли контрактів  **Причини:** 1. `vendor/shared/` — це спільна API д…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > INJECTION_GUARD refactor request routes to reviewer-core/CLAUDE.md
+
+  trace: INJECTION_GUARD refactor request routes to reviewer-core/CLAUDE.md — ok (4 turns)
+    tools:     Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\reviewer-core, C:\Work\Repositories\dev-digest\reviewer-core\CLAUDE.md, C:\Work\Repositories\dev-digest\reviewer-core\src\prompt.ts
+    metrics:   4 turns · 13363ms · 17→1150 tok · 3 tool calls
+    text: Отлично! Я прочитав CLAUDE.md пакету reviewer-core и сам файл `prompt.ts`. Вижу кілька можливостей для рефакторингу без порушення обмежень ("Do not touch"):  ## Аналіз дублювання  У файлі є повторювані паттерни:  1. **Перевірка `trim()` + умовність** (рядки 126-128, 135-136, 140-141, 144-146):    ``…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > secrets question routes to root CLAUDE.md and SecretsProvider convention
+
+  trace: secrets question routes to root CLAUDE.md and SecretsProvider convention — ok (3 turns)
+    tools:     Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\server\CLAUDE.md
+    metrics:   3 turns · 10967ms · 0→3 tok · 1 tool calls
+    text: Хорошо, дотримуюсь правила репо — спершу прочитаю відповідні документи.
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > engineering-insights activates on a genuine discovery
+
+  trace: engineering-insights activates on a genuine discovery — ok (4 turns)
+    tools:     Read, Edit
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\server\INSIGHTS.md, C:\Work\Repositories\dev-digest\CLAUDE.md
+    metrics:   4 turns · 23727ms · 22→1733 tok · 3 tool calls
+    text: Готово! ✅ Зафіксував знахідку в **server/INSIGHTS.md** (рядок 33):  **Проблема:** Запити до pgvector молчаз вертають нуль рядків коли розмірність коло́нки `embedding` не збігається з розмірністю вектора моделі.  **Причина:** pgvector не викидає помилку — це просто не поєднувані типи, результат завжд…
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > near-miss negative — explaining the same topic must NOT record an insight
+
+  trace: near-miss negative — explaining the same topic must NOT record an insight — ERROR (5 turns)
+    tools:     Grep, Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\server\src\db\schema, C:\Work\Repositories\dev-digest\server\src\db\schema\knowledge.ts
+    metrics:   5 turns · 9381ms · 28→525 tok · 4 tool calls
+    text: Дай мені більше контексту про використання pgvector у схемі й запитах: Тепер давай переглянемо, як pgvector колонки використовуються у запитах:
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > pr-self-review activates when user mentions a fresh git commit
+
+  trace: pr-self-review activates when user mentions a fresh git commit — ERROR (5 turns)
+    tools:     Bash, Skill, Agent, Read
+    subagents: (none)
+    skills:    code-review
+    reads:     C:\Work\Repositories\dev-digest\.claude\agents\architecture-reviewer.md, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\architecture-reviewer.cases.ts, C:\Work\Repositories\dev-digest\evals\workflow\review-workflow.cases.ts, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\fixtures\client-only-fat-page.diff, C:\Work\Repositories\dev-digest\.claude\settings.local.json, C:\Work\Repositories\dev-digest\server\INSIGHTS.md, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\fixtures\client-only-fat-page.diff, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\architecture-reviewer.cases.ts, C:\Work\Repositories\dev-digest\evals\workflow\review-workflow.cases.ts, C:\Work\Repositories\dev-digest\evals\workflow\review-workflow.cases.ts, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\architecture-reviewer.cases.ts
+    metrics:   5 turns · 84123ms · 31→1435 tok · 24 tool calls
+    text: Згідно правил цього репо в `CLAUDE.md`, після git commit потрібно виконати:  1. **Обов'язково** — запустити `/pr-self-review` для аналізу комміту 2. **Обов'язково** (якщо змінено 3+ файли) — запустити `/engineering-insight` перед резюме  Дозволь мені спочатку перевірити, скільки файлів було змінено …
+
+stdout | workflow/review-workflow.eval.ts > workflow:review > near-miss negative — git conventions question must NOT trigger pr-self-review
+
+  trace: near-miss negative — git conventions question must NOT trigger pr-self-review — ERROR (5 turns)
+    tools:     Glob, Bash, Read
+    subagents: (none)
+    skills:    (none)
+    reads:     C:\Work\Repositories\dev-digest\CLAUDE.md
+    metrics:   5 turns · 14283ms · 30→772 tok · 6 tool calls
+    text: Дозвольте мені перевірити наявні конвенції та налаштування git у цьому проекті: Дайте мені перевірити скрипти та документацію проекту:
+
+ ❯ workflow/review-workflow.eval.ts (14) 362589ms                                                                                                                                                                       
+   ❯ workflow:review (14) 362588ms                                                                                                                                                                                      
+     × API-route task reads api-contracts AND pulls the architecture-reviewer 91577ms                                                                                                                                   
+     × pipeline task follows CLAUDE.md routing to pipeline.md 25599ms                                                                                                                                                   
+     × CLAUDE.md routes a gotchas lookup to reviewer-core/insights 14699ms                                                                                                                                              
+     × server task reads server/CLAUDE.md before exploring code 20919ms                                                                                                                                                 
+     × client task reads client/CLAUDE.md before exploring code 12165ms                                                                                                                                                 
+     ✓ DB migration error routes to root CLAUDE.md gotchas 8296ms                                                                                                                                                       
+     × client api.ts body-less POST gotcha routes to client/CLAUDE.md 14520ms                                                                                                                                           
+     × vendor/shared edit request routes to server/CLAUDE.md do-not-touch rule 10275ms                                                                                                                                  
+     × INJECTION_GUARD refactor request routes to reviewer-core/CLAUDE.md 15181ms                                                                                                                                       
+     ✓ secrets question routes to root CLAUDE.md and SecretsProvider convention 10971ms                                                                                                                                 
+     × engineering-insights activates on a genuine discovery 25426ms                                                                                                                                                    
+     ✓ near-miss negative — explaining the same topic must NOT record an insight 11170ms                                                                                                                                
+     × pr-self-review activates when user mentions a fresh git commit 85830ms                                                                                                                                           
+     ✓ near-miss negative — git conventions question must NOT trigger pr-self-review 15958ms                                                                                                                            
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > API-route task reads api-contracts AND pulls the architecture-reviewer
+AssertionError: server/docs/api-contracts.md not read | reads: C:\Work\Repositories\dev-digest\server\CLAUDE.md, C:\Work\Repositories\dev-digest\server, C:\Work\Repositories\dev-digest\server\src\modules\reviews\rout
+es.ts, C:\Work\Repositories\dev-digest\server\src\modules, C:\Work\Repositories\dev-digest\server\src\modules\reviews\service.ts, C:\Work\Repositories\dev-digest\server\src\db\schema, C:\Work\Repositories\dev-digest\
+server\src\modules\reviews\helpers.ts, C:\Work\Repositories\dev-digest\server\src\db\schema\reviews.ts, C:\Work\Repositories\dev-digest\server\README.md, C:\Work\Repositories\dev-digest\server\src\modules\reviews\repository.ts, C:\Work\Repositories\dev-digest\server\src\modules\reviews\routes.ts, C:\Work\Repositories\dev-digest\server\src\modules\reviews\service.ts: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > pipeline task follows CLAUDE.md routing to pipeline.md
+AssertionError: reviewer-core/docs/pipeline.md not read | reads: C:\Work\Repositories\dev-digest\reviewer-core\CLAUDE.md, C:\Work\Repositories\dev-digest\server\CLAUDE.md, C:\Work\Repositories\dev-digest\reviewer-cor
+e\INSIGHTS.md, C:\Work\Repositories\dev-digest\server\INSIGHTS.md, C:\Work\Repositories\dev-digest\reviewer-core\README.md, C:\Work\Repositories\dev-digest\server\README.md: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > CLAUDE.md routes a gotchas lookup to reviewer-core/insights
+AssertionError: reviewer-core/insights/gotchas.md not read | reads: C:\Work\Repositories\dev-digest\reviewer-core\INSIGHTS.md: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > server task reads server/CLAUDE.md before exploring code
+AssertionError: server/CLAUDE.md not read | reads: C:\Work\Repositories\dev-digest\server\CLAUDE.md, C:\Work\Repositories\dev-digest\server\src\modules\index.ts, C:\Work\Repositories\dev-digest\server\src\modules\settings\routes.ts: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > client task reads client/CLAUDE.md before exploring code
+AssertionError: client/CLAUDE.md not read | reads: C:\Work\Repositories\dev-digest\client\CLAUDE.md: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > client api.ts body-less POST gotcha routes to client/CLAUDE.md
+AssertionError: client/CLAUDE.md not read | reads: C:\Work\Repositories\dev-digest\client\CLAUDE.md, C:\Work\Repositories\dev-digest\client\INSIGHTS.md: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > vendor/shared edit request routes to server/CLAUDE.md do-not-touch rule
+AssertionError: server/CLAUDE.md not read | reads: C:\Work\Repositories\dev-digest\server\CLAUDE.md: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > INJECTION_GUARD refactor request routes to reviewer-core/CLAUDE.md
+AssertionError: reviewer-core/CLAUDE.md not read | reads: C:\Work\Repositories\dev-digest\reviewer-core, C:\Work\Repositories\dev-digest\reviewer-core\CLAUDE.md, C:\Work\Repositories\dev-digest\reviewer-core\src\prompt.ts: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:177:15
+    175|               result.filesRead.some((f) => f.includes(file)),
+    176|               `${file} not read | reads: ${result.filesRead.join(", ")}`,
+    177|             ).toBe(true);
+       |               ^
+    178|           }
+    179|           expect(result.isError).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > engineering-insights activates on a genuine discovery
+AssertionError: skills:  | reads: C:\Work\Repositories\dev-digest\server\INSIGHTS.md, C:\Work\Repositories\dev-digest\CLAUDE.md: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:141:13
+    139|             activated(result, c.skill),
+    140|             `skills: ${result.skillsInvoked.join(", ")} | reads: ${result.filesRead.join(", ")}`,
+    141|           ).toBe(c.shouldActivate);
+       |             ^
+    142|         } finally {
+    143|           record(c.name, { result });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  workflow/review-workflow.eval.ts > workflow:review > pr-self-review activates when user mentions a fresh git commit
+AssertionError: skills: code-review | reads: C:\Work\Repositories\dev-digest\.claude\agents\architecture-reviewer.md, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\architecture-reviewer.cases.ts,
+ C:\Work\Repositories\dev-digest\evals\workflow\review-workflow.cases.ts, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\fixtures\client-only-fat-page.diff, C:\Work\Repositories\dev-digest\.claude
+\settings.local.json, C:\Work\Repositories\dev-digest\server\INSIGHTS.md, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\fixtures\client-only-fat-page.diff, C:\Work\Repositories\dev-digest\evals\a
+gents\architecture-reviewer\architecture-reviewer.cases.ts, C:\Work\Repositories\dev-digest\evals\workflow\review-workflow.cases.ts, C:\Work\Repositories\dev-digest\evals\workflow\review-workflow.cases.ts, C:\Work\Repositories\dev-digest\evals\agents\architecture-reviewer\architecture-reviewer.cases.ts: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/dsl/case.ts:141:13
+    139|             activated(result, c.skill),
+    140|             `skills: ${result.skillsInvoked.join(", ")} | reads: ${result.filesRead.join(", ")}`,
+    141|           ).toBe(c.shouldActivate);
+       |             ^
+    142|         } finally {
+    143|           record(c.name, { result });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 4 passed (14)
+   Start at  11:56:06
+   Duration  363.24s (transform 94ms, setup 0ms, collect 369ms, tests 362.59s, environment 0ms, prepare 97ms)
+

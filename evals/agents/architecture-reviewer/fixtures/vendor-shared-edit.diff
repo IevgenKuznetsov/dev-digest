@@ -1,0 +1,15 @@
+diff --git a/server/src/vendor/shared/contracts/pr.ts b/server/src/vendor/shared/contracts/pr.ts
+index aaaaaaa..bbbbbbb 100644
+--- a/server/src/vendor/shared/contracts/pr.ts
++++ b/server/src/vendor/shared/contracts/pr.ts
+@@ -1,8 +1,9 @@
+ import { z } from "zod";
+
+ export const PrSchema = z.object({
+   id: z.string(),
+   title: z.string(),
+   url: z.string().url(),
++  description: z.string().optional(),
+ });
+
+ export type Pr = z.infer<typeof PrSchema>;

@@ -17,10 +17,12 @@ import {
   type Severity,
   type Category,
 } from "@devdigest/ui";
-import type { FindingRecord, FindingActionKind } from "@devdigest/shared";
+import type { FindingRecord, FindingActionKind, CreateEvalCaseInput, ExpectedOutputItem } from "@devdigest/shared";
 import { SEV_COLOR, SEV_COLOR_FALLBACK } from "./constants";
 import { lineLabel } from "./helpers";
 import { githubBlobUrl } from "../../../../../../../lib/github-urls";
+import { extractRelevantHunks, wrapPatchWithDiffHeader } from "../../../../../../../lib/diff-utils";
+import { notify } from "../../../../../../../lib/toast";
 import { s } from "./styles";
 
 export function FindingCard({
@@ -32,6 +34,8 @@ export function FindingCard({
   repoFullName,
   headSha,
   highlighted,
+  onCreateEvalCase,
+  fileDiff,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -42,6 +46,10 @@ export function FindingCard({
   headSha?: string | null;
   /** When true, the card shows a temporary glow highlight (auto-clears after 2s). */
   highlighted?: boolean;
+  /** Called with pre-populated data when "Turn into eval case" is clicked. */
+  onCreateEvalCase?: (data: Partial<CreateEvalCaseInput>) => void;
+  /** The unified diff text for the finding's file (captured from the file diff view). */
+  fileDiff?: string;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -132,6 +140,35 @@ export function FindingCard({
               onClick={() => onAction?.("dismiss")}
             >
               {t("finding.dismiss")}
+            </Button>
+            <Button
+              kind="ghost"
+              size="sm"
+              icon="FlaskConical"
+              disabled={!accepted && !dismissed}
+              onClick={() => {
+                if (!fileDiff) {
+                  notify.error(t("finding.evalCaseNoDiff"));
+                  return;
+                }
+                onCreateEvalCase?.({
+                  name: f.title,
+                  input_diff: wrapPatchWithDiffHeader(f.file, extractRelevantHunks(fileDiff, f.start_line, f.end_line)),
+                  expected_output: [
+                    {
+                      type: accepted ? "must_find" : "must_not_flag",
+                      file: f.file,
+                      start_line: f.start_line,
+                      end_line: f.end_line,
+                      severity: f.severity as ExpectedOutputItem["severity"],
+                      category: f.category ?? undefined,
+                      title: f.title,
+                    },
+                  ],
+                });
+              }}
+            >
+              {t("finding.turnIntoEvalCase")}
             </Button>
           </div>
         </div>

@@ -5,7 +5,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, CreateEvalCaseInput } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
 import { KEY_TO_ACTION } from "./constants";
@@ -17,14 +17,20 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  fileDiffMap,
   targetFindingId,
+  onCreateEvalCase,
 }: {
   findings: FindingRecord[];
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Pre-built path → patch map so FindingCards can populate eval-case diffs. */
+  fileDiffMap?: Map<string, string>;
   /** When set, the matching FindingCard auto-expands, scrolls into view, and highlights. */
   targetFindingId?: string | null;
+  /** Called when user clicks "Turn into eval case" on a FindingCard. */
+  onCreateEvalCase?: (data: Partial<CreateEvalCaseInput>) => void;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -81,7 +87,9 @@ export function FindingsPanel({
               repoFullName={repoFullName}
               headSha={headSha}
               highlighted={f.id === targetFindingId}
+              fileDiff={fileDiffMap?.get(f.file)}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
+              onCreateEvalCase={onCreateEvalCase}
             />
           ))
         )}

@@ -8,6 +8,14 @@
 - [README.md](README.md) — narrative overview (API map, DI flow, env vars)
 - [src/modules/repo-intel/README.md](src/modules/repo-intel/README.md) — repo-intel pipeline and facade
 
+## Read When
+
+| Situation | Read first |
+|-----------|-----------|
+| Adding or changing a Fastify route / API endpoint | [`docs/api-contracts.md`](docs/api-contracts.md) |
+| Working with `vendor/shared/` Zod schemas | [`docs/api-contracts.md`](docs/api-contracts.md) |
+| Adding a new server module | [`docs/api-contracts.md`](docs/api-contracts.md) then `server/CLAUDE.md` Map section |
+
 ## Tech stack
 
 Fastify 5, Drizzle ORM, PostgreSQL 16 + pgvector, Zod (validation + type provider),

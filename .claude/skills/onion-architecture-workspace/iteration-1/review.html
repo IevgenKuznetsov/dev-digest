@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "onion-architecture", "runs": [{"id": "eval-1-domain-imports-infra-with_skill", "prompt": "We just merged a notification module into the server. I want to make sure the code is architecturally clean before we cut a release. Can you review the implementation and flag anything that doesn't follow proper layering?", "eval_id": 1, "outputs": [{"name": "review.md", "type": "text", "content": "# Onion Architecture Review: Notification Module\n\n**Reviewed by:** Architecture Reviewer (onion-architecture skill)\n**Files reviewed:**\n- `modules/notification/domain/NotificationService.ts`\n- `modules/notification/routes.ts`\n\n---\n\n## Summary\n\nThe notification module contains **two critical layer dependency violations**. The most severe is in `NotificationService.ts`, which lives in the `domain/` folder but imports and directly uses Drizzle ORM infrastructure. The second violation is in `routes.ts`, which instantiates the service concretely (bypassing dependency injection) and omits a proper application layer. Neither file is release-ready as written.\n\n---\n\n## Violation 1: Domain Layer Imports Infrastructure (CRITICAL)\n\n**File:** `modules/notification/domain/NotificationService.ts`\n**Lines:** 1\u0432\u0402\u201c3\n\n```typescript\nimport { eq, and } from 'drizzle-orm';\nimport { db } from '../../../db';\nimport { notifications } from '../../../db/schema';\n```\n\n### What the rule says\n\nThe domain layer is the innermost ring of the onion. It must have **zero external dependencies** \u0432\u0402\u201d no Drizzle, no Fastify, no npm packages. From `dependency-rule.md`:\n\n> \"Domain (`domain/`, `helpers.ts`, `constants.ts`) MUST NOT import from: `drizzle-orm`, `fastify`, `../../adapters/`, any npm package.\"\n\nFrom `anti-patterns.md` (Anti-Pattern #1, \"Leaking Infrastructure into Domain\"):\n\n> \"Domain files import from infrastructure packages. Fix: Domain code uses only pure TypeScript. Move infrastructure-dependent logic to the infrastructure or application layer.\"\n\n### Why this is a problem\n\n`NotificationService` is physically located in `domain/` but is behaviorally an infrastructure class \u0432\u0402\u201d it directly queries the database. This collapse of two layers into one destroys the key property onion architecture exists to provide: the domain is no longer testable without a live database, and any schema change (column rename, type change, added nullable) forces changes to the \"domain\" file.\n\nConcretely:\n- `eq`, `and` from `drizzle-orm` are Drizzle query builder helpers \u0432\u0402\u201d infrastructure concepts.\n- `db` is the Drizzle database connection singleton \u0432\u0402\u201d a runtime infrastructure dependency.\n- `notifications` from `../../../db/schema` is a Drizzle table descriptor \u0432\u0402\u201d the ORM representation of the DB schema, not a domain concept.\n\nEvery method in `NotificationService` (`getUnread`, `getUnreadCount`, `markRead`, `markAllRead`, `create`, `deleteOld`) directly executes Drizzle queries. There is no domain logic here at all; the file is a repository masquerading as a domain service inside the domain folder.\n\n### Fix\n\nSplit into three proper layers:\n\n**1. Domain layer \u0432\u0402\u201d define the interface (port) and entity type**\n\n```typescript\n// domain/ports.ts\nimport type { Notification } from './entities.js';\n\nexport interface NotificationRepository {\n  findUnread(userId: string): Promise<Notification[]>;\n  countUnread(userId: string): Promise<number>;\n  markRead(notificationId: string, userId: string): Promise<void>;\n  markAllRead(userId: string): Promise<void>;\n  create(userId: string, title: string, body: string): Promise<string>;\n  deleteReadOlderThan(userId: string, cutoff: Date): Promise<number>;\n}\n\n// domain/entities.ts\nexport interface Notification {\n  id: string;\n  userId: string;\n  title: string;\n  body: string;\n  read: boolean;\n  readAt: Date | null;\n  createdAt: Date;\n}\n```\n\n**2. Infrastructure layer \u0432\u0402\u201d implement the repository with Drizzle**\n\n```typescript\n// infrastructure/NotificationRepository.ts\nimport { eq, and, lt } from 'drizzle-orm';\nimport { db } from '../../../db';\nimport { notifications } from '../../../db/schema';\nimport type { NotificationRepository } from '../domain/ports.js';\nimport type { Notification } from '../domain/entities.js';\n\nexport class DrizzleNotificationRepository implements NotificationRepository {\n  async findUnread(userId: string): Promise<Notification[]> {\n    return db\n      .select()\n      .from(notifications)\n      .where(and(eq(notifications.userId, userId), eq(notifications.read, false)))\n      .orderBy(notifications.createdAt);\n  }\n  // ... other methods\n}\n```\n\n**3. Application layer \u0432\u0402\u201d orchestrate via the port**\n\n```typescript\n// service.ts\nimport type { NotificationRepository } from './domain/ports.js';\n\nexport class NotificationService {\n  constructor(private readonly repo: NotificationRepository) {}\n\n  async getUnread(userId: string) { return this.repo.findUnread(userId); }\n  async getUnreadCount(userId: string) { return this.repo.countUnread(userId); }\n  async markRead(notificationId: string, userId: string) {\n    return this.repo.markRead(notificationId, userId);\n  }\n  async markAllRead(userId: string) { return this.repo.markAllRead(userId); }\n  async create(userId: string, title: string, body: string) {\n    return this.repo.create(userId, title, body);\n  }\n  async deleteOld(userId: string, olderThanDays: number) {\n    const cutoff = new Date();\n    cutoff.setDate(cutoff.getDate() - olderThanDays);\n    return this.repo.deleteReadOlderThan(userId, cutoff);\n  }\n}\n```\n\n---\n\n## Violation 2: Presentation Layer Bypasses Dependency Injection (HIGH)\n\n**File:** `modules/notification/routes.ts`\n**Line:** 5\n\n```typescript\nconst service = new NotificationService();\n```\n\n### What the rule says\n\nFrom `anti-patterns.md` (Anti-Pattern #6, \"Container as Service Locator\") and the composition root principle in `dependency-rule.md`:\n\n> \"The composition root wires everything \u0432\u0402\u201d `platform/container.ts` is the single place that binds concrete implementations to abstract interfaces.\"\n\nFrom `dependency-rule.md`:\n\n> \"The service layer depends on `GitHubClient` (the interface), never on `OctokitGitHubClient` (the implementation). The Container resolves the concrete type at runtime.\"\n\n### Why this is a problem\n\n`routes.ts` calls `new NotificationService()` directly, hard-wiring the concrete class into the presentation layer. This has several consequences:\n\n1. **No dependency injection:** The concrete implementation cannot be swapped. In tests, there is no way to substitute a mock repository \u0432\u0402\u201d the route will always attempt to connect to a real database.\n2. **Layer skip:** Even once `NotificationService` is properly placed in the application layer, routes should receive it via the Fastify `request.server` context or a container, not by constructing it directly.\n3. **Bypasses the composition root:** `platform/container.ts` is the designated wiring point for the project. Creating service instances in route files circumvents this pattern and makes the dependency graph invisible.\n\nAdditionally, `routes.ts` imports directly from `'./domain/NotificationService'` \u0432\u0402\u201d a presentation layer importing from the domain layer is itself a mild smell. The route should import from the application layer (`service.ts`), not from domain internals.\n\n### Fix\n\nWire through the container and receive the service via injection:\n\n```typescript\n// routes.ts\nimport type { FastifyInstance } from 'fastify';\nimport { z } from 'zod';\n\nconst markReadSchema = z.object({\n  notificationId: z.string().uuid(),\n});\n\nexport async function notificationRoutes(app: FastifyInstance) {\n  // Service is injected from the container via Fastify decorator\n  const service = app.container.notificationService();\n\n  app.get('/notifications', async (req, reply) => {\n    const userId = (req.user as any).id;\n    const items = await service.getUnread(userId);\n    return reply.send({ notifications: items });\n  });\n  // ... remaining handlers unchanged\n}\n```\n\nAnd register in the composition root:\n\n```typescript\n// platform/container.ts\nnotificationService(): NotificationService {\n  return new NotificationService(new DrizzleNotificationRepository());\n}\n```\n\n---\n\n## Violation 3: Missing Application Layer Abstraction for deleteOld Cutoff Logic\n\n**File:** `modules/notification/domain/NotificationService.ts`\n**Lines:** 54\u0432\u0402\u201c57\n\n```typescript\nasync deleteOld(userId: string, olderThanDays: number): Promise<number> {\n  const cutoff = new Date();\n  cutoff.setDate(cutoff.getDate() - olderThanDays);\n```\n\n### What the rule says\n\nFrom `anti-patterns.md` (Anti-Pattern #3, \"Fat Controllers / Fat Routes\") and by extension any fat layer: date arithmetic deriving a business cutoff is application-layer orchestration logic, not infrastructure. But here it sits in a class that also executes the Drizzle delete query \u0432\u0402\u201d blurring application and infrastructure concerns in the same method.\n\n### Why this is a problem\n\nThis is a secondary issue that only becomes visible once the primary violation is fixed. When `NotificationService` is properly placed in the application layer and delegates to a `NotificationRepository` port, the `cutoff` computation belongs in the service (application layer), while the actual delete query belongs in the repository (infrastructure). The current code does both in one place.\n\nThe proposed fix in Violation 1 already addresses this correctly: `service.ts` computes the cutoff and passes a `Date` to `repo.deleteReadOlderThan(userId, cutoff)`.\n\n---\n\n## Additional Concern: Absent Request Validation on Routes\n\n**File:** `modules/notification/routes.ts`\n\n`markReadSchema` is defined but never used. The `DELETE /notifications/old` route reads `days` from query parameters without any validation:\n\n```typescript\nconst days = Number((req.query as any).days) || 30;\n```\n\nThis is not a layering violation but is a presentation-layer quality gap. Use the defined Zod schema (or expand it) and apply it with `{ schema: { querystring: ... } }` on the route definition. From the skill's quick reference: \"Presentation \u0432\u0402\u201d Zod request schemas\" is an explicit responsibility of this layer.\n\n---\n\n## PR Review Checklist Result\n\n| Check | Result |\n|---|---|\n| No `drizzle-orm` imports in domain files | FAIL \u0432\u0402\u201d `NotificationService.ts` imports `eq`, `and` from `drizzle-orm` |\n| No `$inferSelect` types used outside repository files | PASS (not present) |\n| Routes are thin (validate, context, delegate, respond) | PARTIAL \u0432\u0402\u201d routes delegate correctly but instantiate the service directly |\n| Services throw domain errors, not HTTP errors | N/A \u0432\u0402\u201d no error handling present |\n| No cross-module internal imports | PASS |\n| Container not passed into domain services | N/A \u0432\u0402\u201d no container used at all (direct construction) |\n| Repository methods return domain entities | FAIL \u0432\u0402\u201d there is no repository layer; domain returns raw DB rows |\n| New interfaces defined in inner layers, implementations in outer layers | FAIL \u0432\u0402\u201d no interfaces defined; single class spans all layers |\n\n---\n\n## Recommended Remediation Order\n\n1. **Create `domain/entities.ts`** \u0432\u0402\u201d extract the `Notification` interface with no imports.\n2. **Create `domain/ports.ts`** \u0432\u0402\u201d define `NotificationRepository` interface with domain-typed method signatures.\n3. **Create `infrastructure/NotificationRepository.ts`** \u0432\u0402\u201d move all Drizzle code here, implementing the port.\n4. **Rename and fix `domain/NotificationService.ts` \u0432\u2020\u2019 `service.ts`** \u0432\u0402\u201d rewrite to receive `NotificationRepository` via constructor injection, keep only orchestration logic.\n5. **Update `routes.ts`** \u0432\u0402\u201d remove `new NotificationService()`, receive service from container/decorator, fix unused schema and unvalidated query params.\n6. **Register in composition root** \u0432\u0402\u201d wire `DrizzleNotificationRepository` to `NotificationRepository` port in `platform/container.ts`.\n"}], "grading": null}, {"id": "eval-1-domain-imports-infra-without_skill", "prompt": "We just merged a notification module into the server. I want to make sure the code is architecturally clean before we cut a release. Can you review the implementation and flag anything that doesn't follow proper layering?", "eval_id": 1, "outputs": [{"name": "review.md", "type": "text", "content": "# Architecture Review: Notification Module\n\n## Summary\n\nThe notification module consists of two files:\n- `modules/notification/domain/NotificationService.ts` \u0432\u0402\u201d placed in a `domain/` directory\n- `modules/notification/routes.ts` \u0432\u0402\u201d the HTTP layer\n\nOn the surface the structure looks reasonable, but there is a critical layering violation in `NotificationService.ts` that undermines the intent of a domain layer entirely.\n\n---\n\n## Critical Issues\n\n### 1. Domain Layer Directly Imports Infrastructure (Drizzle + DB Connection)\n\n**File:** `modules/notification/domain/NotificationService.ts`, lines 1\u0432\u0402\u201c3\n\n```ts\nimport { eq, and } from 'drizzle-orm';\nimport { db } from '../../../db';\nimport { notifications } from '../../../db/schema';\n```\n\n**Violation:** In a properly layered architecture (Onion / Clean / Hexagonal), the domain layer must have zero knowledge of how data is persisted. It should define interfaces (ports) that infrastructure implementations fulfill. Here, `NotificationService` \u0432\u0402\u201d named and located as a domain service \u0432\u0402\u201d reaches directly into:\n\n- The live Drizzle ORM client (`db`)\n- The concrete DB schema table (`notifications`)\n- Drizzle query builder utilities (`eq`, `and`)\n\nThis collapses the domain and infrastructure layers into a single class, making it impossible to:\n- Unit-test `NotificationService` without a real (or mocked) database connection\n- Swap the persistence mechanism (e.g., to an in-memory store for tests, or a different DB)\n- Reason about business rules independently of storage details\n\n**Fix:** Extract a `INotificationRepository` interface in the domain layer and move all Drizzle-specific code into an infrastructure class (e.g., `DrizzleNotificationRepository`). Inject the repository into `NotificationService` via constructor.\n\n```ts\n// domain/INotificationRepository.ts\nexport interface INotificationRepository {\n  findUnreadByUser(userId: string): Promise<Notification[]>;\n  countUnreadByUser(userId: string): Promise<number>;\n  markRead(notificationId: string, userId: string): Promise<void>;\n  markAllRead(userId: string): Promise<void>;\n  create(userId: string, title: string, body: string): Promise<string>;\n  deleteOldRead(userId: string, olderThanDays: number): Promise<number>;\n}\n\n// domain/NotificationService.ts\nexport class NotificationService {\n  constructor(private readonly repo: INotificationRepository) {}\n\n  async getUnread(userId: string): Promise<Notification[]> {\n    return this.repo.findUnreadByUser(userId);\n  }\n  // ... delegate remaining methods\n}\n\n// infrastructure/DrizzleNotificationRepository.ts\nimport { eq, and } from 'drizzle-orm';\nimport { db } from '../../../db';\nimport { notifications } from '../../../db/schema';\nimport { INotificationRepository } from '../domain/INotificationRepository';\n\nexport class DrizzleNotificationRepository implements INotificationRepository {\n  // ... all Drizzle queries live here\n}\n```\n\n---\n\n### 2. `deleteOld` Does Not Apply the `olderThanDays` Cutoff in the Query\n\n**File:** `modules/notification/domain/NotificationService.ts`, lines 54\u0432\u0402\u201c62\n\n```ts\nasync deleteOld(userId: string, olderThanDays: number): Promise<number> {\n  const cutoff = new Date();\n  cutoff.setDate(cutoff.getDate() - olderThanDays);\n  const deleted = await db\n    .delete(notifications)\n    .where(and(eq(notifications.userId, userId), eq(notifications.read, true)))\n    .returning({ id: notifications.id });\n  return deleted.length;\n}\n```\n\n**Bug / Logic Error:** The `cutoff` date is computed but never used in the `.where()` clause. The query deletes **all** read notifications for the user regardless of age, not just those older than `olderThanDays`. The method signature and surrounding code imply a date filter, but it is silently dropped.\n\nThis is both a correctness bug and a symptom of the layering problem: business rules (age-based retention) are buried inside a method that is also doing raw DB operations, making the logic easy to overlook.\n\n**Fix:** Add a `lt` (less-than) predicate on `notifications.createdAt`:\n\n```ts\n.where(and(\n  eq(notifications.userId, userId),\n  eq(notifications.read, true),\n  lt(notifications.createdAt, cutoff)   // apply the cutoff\n))\n```\n\n---\n\n## Moderate Issues\n\n### 3. Module-Level Singleton Service in Routes\n\n**File:** `modules/notification/routes.ts`, line 5\n\n```ts\nconst service = new NotificationService();\n```\n\n`NotificationService` is instantiated as a module-level singleton with no way to inject dependencies (because the current implementation takes no constructor arguments). Once the repository abstraction is introduced (see Issue 1), this must change to:\n\n```ts\nexport async function notificationRoutes(app: FastifyInstance) {\n  const repo = new DrizzleNotificationRepository();\n  const service = new NotificationService(repo);\n  // ...\n}\n```\n\nOr, preferably, wire dependencies through a DI container or Fastify's `decorate`/plugin system so that tests can substitute the repository.\n\n### 4. Untyped `req.user` Access\n\n**File:** `modules/notification/routes.ts`, lines 13, 20, 26, 32, 39\n\n```ts\nconst userId = (req.user as any).id;\n```\n\nCasting `req.user` to `any` on every handler bypasses TypeScript's type safety. Fastify supports augmenting `FastifyRequest` via declaration merging:\n\n```ts\n// types/fastify.d.ts\nimport 'fastify';\ndeclare module 'fastify' {\n  interface FastifyRequest {\n    user: { id: string; /* other fields */ };\n  }\n}\n```\n\nOnce the type is declared, `req.user.id` is safe without casts and errors surface at compile time if the auth middleware is absent or changes shape.\n\n### 5. `markReadSchema` Is Declared but Never Used\n\n**File:** `modules/notification/routes.ts`, lines 7\u0432\u0402\u201c9\n\n```ts\nconst markReadSchema = z.object({\n  notificationId: z.string().uuid(),\n});\n```\n\nThis schema is defined but never applied to any route. The `POST /notifications/:id/read` handler reads the `id` from `req.params` without validation. The dead code suggests an incomplete implementation. Either apply the schema or remove it.\n\n---\n\n## Minor Issues\n\n### 6. `getUnreadCount` Uses a Full Row Fetch Instead of `count()`\n\n**File:** `modules/notification/domain/NotificationService.ts`, lines 24\u0432\u0402\u201c29\n\n```ts\nconst rows = await db\n  .select({ id: notifications.id })\n  .from(notifications)\n  .where(...);\nreturn rows.length;\n```\n\nFetching all matching row IDs and counting them in JavaScript is wasteful compared to a `SELECT COUNT(*)` pushed to the database. For large notification sets this degrades linearly. Use Drizzle's `count()` aggregate:\n\n```ts\nimport { count } from 'drizzle-orm';\nconst [{ value }] = await db\n  .select({ value: count() })\n  .from(notifications)\n  .where(...);\nreturn value;\n```\n\n---\n\n## Summary Table\n\n| # | Severity | Location | Issue |\n|---|----------|----------|-------|\n| 1 | Critical | `domain/NotificationService.ts` | Domain layer directly imports Drizzle ORM and DB \u0432\u0402\u201d no repository abstraction |\n| 2 | Critical | `domain/NotificationService.ts:54-62` | `deleteOld` cutoff date computed but never applied in query |\n| 3 | Moderate | `routes.ts:5` | Module-level singleton prevents DI and testing |\n| 4 | Moderate | `routes.ts` (all handlers) | `req.user as any` suppresses type safety |\n| 5 | Moderate | `routes.ts:7-9` | `markReadSchema` declared but never applied or used |\n| 6 | Minor | `domain/NotificationService.ts:24-29` | Count via full row fetch instead of SQL `COUNT()` |\n\n---\n\n## Recommended Layering Structure\n\n```\nmodules/notification/\n  domain/\n    Notification.ts              # Entity / value object types\n    INotificationRepository.ts   # Port (interface)\n    NotificationService.ts       # Domain service \u0432\u0402\u201d depends only on INotificationRepository\n  infrastructure/\n    DrizzleNotificationRepository.ts   # Adapter \u0432\u0402\u201d implements INotificationRepository\n  routes.ts                      # HTTP layer \u0432\u0402\u201d wires infrastructure \u0432\u2020\u2019 domain \u0432\u2020\u2019 HTTP\n```\n\nThe dependency rule: every arrow must point inward. `routes.ts` \u0432\u2020\u2019 `NotificationService` (domain) \u0432\u2020\u2019 `INotificationRepository` (domain). `DrizzleNotificationRepository` (infrastructure) \u0432\u2020\u2019 `INotificationRepository` (domain). The domain never references infrastructure.\n"}], "grading": null}, {"id": "eval-2-application-bypasses-port-with_skill", "prompt": "We're doing a pre-merge architecture review of the analytics module. The team built it quickly and I want a second set of eyes before it lands in main. What do you see?", "eval_id": 2, "outputs": [{"name": "review.md", "type": "text", "content": "# Architecture Review: Analytics Module (Pre-Merge)\n\n**Reviewer:** Onion Architecture Skill (v1.0.0)\n**Date:** 2026-08-19\n**Scope:** `modules/analytics/` \u0432\u0402\u201d `domain/types.ts`, `repository.ts`, `service.ts`, `routes.ts`\n\n---\n\n## Summary\n\nThe analytics module has structural bones in the right place (a `domain/` folder, a repository file, a service, and routes) but has four concrete onion-architecture violations that will make the module progressively harder to test and maintain. Two of them are **critical** (service locator bypass + presentation layer reaching into infrastructure directly); the other two are **moderate** (business logic migrated into infrastructure, missing port interface). None are exotic \u0432\u0402\u201d they are the classic \"we built it fast\" patterns this review exists to catch.\n\n---\n\n## Violation 1 \u0432\u0402\u201d Application Layer Bypasses the Port (CRITICAL)\n\n**Where:** `service.ts` lines 1 and 8\n\n```typescript\n// service.ts\nimport { AnalyticsRepository } from './repository';   // imports the CONCRETE class\n\nexport class AnalyticsService {\n  private repo: AnalyticsRepository;\n  constructor() {\n    this.repo = new AnalyticsRepository();             // constructs it directly\n  }\n}\n```\n\n**Why it violates onion architecture:**\nThe Application layer (`service.ts`) must depend on an **interface** (port) defined in the Domain layer, not on a concrete infrastructure class. Here the service both imports and instantiates `AnalyticsRepository` \u0432\u0402\u201d the concrete Drizzle-backed class \u0432\u0402\u201d which means:\n\n1. The application layer has an outward dependency on the infrastructure layer, reversing the required dependency direction.\n2. The service cannot be unit-tested without a real database; there is no seam to inject a mock.\n3. Swapping the storage backend (e.g., replacing Drizzle with a different ORM, or adding a caching layer) requires editing the service, not just swapping an adapter.\n\n**Fix:**\n\nStep 1 \u0432\u0402\u201d Define a port (interface) in the domain layer:\n\n```typescript\n// domain/ports.ts\nimport type { PageView, DashboardStats } from './types';\n\nexport interface AnalyticsPort {\n  record(view: PageView): Promise<void>;\n  getDashboardStats(fromDate: Date): Promise<DashboardStats>;\n  getRecentViews(limit: number): Promise<PageView[]>;\n}\n```\n\nStep 2 \u0432\u0402\u201d Make the repository implement the port:\n\n```typescript\n// repository.ts\nimport type { AnalyticsPort } from './domain/ports';\nexport class AnalyticsRepository implements AnalyticsPort { ... }\n```\n\nStep 3 \u0432\u0402\u201d Inject the port into the service (not the concrete class):\n\n```typescript\n// service.ts\nimport type { AnalyticsPort } from './domain/ports';\n\nexport class AnalyticsService {\n  constructor(private repo: AnalyticsPort) {}\n  // methods unchanged\n}\n```\n\nStep 4 \u0432\u0402\u201d Wire the concrete class in the composition root (`platform/container.ts`), not inside the service.\n\n---\n\n## Violation 2 \u0432\u0402\u201d No-Arg Constructor Breaks DI / Makes Service Untestable (CRITICAL)\n\n**Where:** `service.ts` line 7\n\n```typescript\nconstructor() {\n  this.repo = new AnalyticsRepository();\n}\n```\n\n**Why it violates onion architecture:**\nThe composition root (`platform/container.ts`) is the only place that should construct concrete implementations and wire them to interfaces. When a service constructs its own collaborators, it bypasses the container entirely. This is the **service locator anti-pattern** \u0432\u0402\u201d the service secretly creates its own infrastructure, making it impossible to:\n\n- Inject a test double (no mock can be passed in)\n- Intercept the construction for metrics, tracing, or caching\n- Apply any container-level lifecycle management (e.g., sharing a DB connection pool)\n\nThis violation compounds Violation 1: even if a port interface were introduced, a no-arg constructor would still prevent injection.\n\n**Fix:**\nRequire the port as a constructor argument (shown in the Violation 1 fix above). The container constructs `AnalyticsRepository` and passes it in:\n\n```typescript\n// platform/container.ts\nget analyticsService(): AnalyticsService {\n  return (this._analyticsService ??= new AnalyticsService(\n    new AnalyticsRepository(this.db),\n  ));\n}\n```\n\n---\n\n## Violation 3 \u0432\u0402\u201d Presentation Layer Reaches Directly into Infrastructure (CRITICAL)\n\n**Where:** `routes.ts` lines 3\u0432\u0402\u201c7 and 18, 35\u0432\u0402\u201c45\n\n```typescript\n// routes.ts\nimport { AnalyticsRepository } from './repository';  // infrastructure import in presentation\nimport { db } from '../../db';                        // raw DB handle in presentation\nimport { pageViews } from '../../db/schema';          // DB schema in presentation\nimport { desc } from 'drizzle-orm';                   // ORM import in presentation\n\nexport async function analyticsRoutes(app: FastifyInstance) {\n  const service = new AnalyticsService();\n  const repo = new AnalyticsRepository();             // second repo instance constructed here\n\n  // /analytics/recent bypasses service entirely \u0432\u0402\u201d uses repo directly\n  app.get('/analytics/recent', async (req, reply) => {\n    const events = await repo.getRecentViews(limit);\n    return reply.send({ events });\n  });\n\n  // /analytics/live bypasses ALL layers \u0432\u0402\u201d raw SQL query in a route handler\n  app.get('/analytics/live', async (req, reply) => {\n    const rows = await db\n      .select()\n      .from(pageViews)\n      .orderBy(desc(pageViews.timestamp))\n      .limit(10);\n    return reply.send({ live: rows });\n  });\n}\n```\n\n**Why it violates onion architecture:**\nThe Presentation layer (`routes.ts`) must depend on the Application layer only. It must not import from infrastructure (`repository.ts`, `db/schema`, `drizzle-orm`) or bypass the service layer. Two routes do this:\n\n- `/analytics/recent` skips the service and calls the repository directly. The application layer (the `getRecentActivity` use case on `AnalyticsService`) is simply ignored for this endpoint.\n- `/analytics/live` skips every layer and embeds a raw Drizzle query in the route handler \u0432\u0402\u201d putting infrastructure logic in the presentation layer.\n\nConsequences:\n- Any business rules (authorization checks, field filtering, rate limiting) that belong in the service will silently not apply to these two endpoints.\n- DB queries are duplicated across layers; a schema change must be patched in multiple files.\n- The route file is untestable without a real database.\n- The import of `drizzle-orm` directly in a route is the clearest signal of a fat-route anti-pattern.\n\n**Fix:**\n\nAdd `getLiveEvents` to `AnalyticsService` (and the corresponding method to `AnalyticsPort`):\n\n```typescript\n// domain/ports.ts \u0432\u0402\u201d add:\ngetLiveEvents(limit: number): Promise<PageView[]>;\n\n// service.ts \u0432\u0402\u201d add:\nasync getLiveEvents(limit: number = 10): Promise<PageView[]> {\n  return this.repo.getLiveEvents(limit);\n}\n\n// repository.ts \u0432\u0402\u201d add:\nasync getLiveEvents(limit: number): Promise<PageView[]> {\n  const rows = await db\n    .select()\n    .from(pageViews)\n    .orderBy(desc(pageViews.timestamp))\n    .limit(limit);\n  return rows.map(toPageView);\n}\n```\n\nThen thin down the routes to delegate everything to the service, receive it via injection (not `new`), and remove all infrastructure imports:\n\n```typescript\n// routes.ts (corrected)\nimport type { FastifyInstance } from 'fastify';\nimport { z } from 'zod';\nimport type { AnalyticsService } from './service';\n\nconst trackSchema = z.object({ ... });\n\nexport async function analyticsRoutes(app: FastifyInstance, service: AnalyticsService) {\n  app.post('/analytics/track', async (req, reply) => {\n    const body = trackSchema.parse(req.body);\n    const userId = (req.user as any)?.id ?? null;\n    await service.trackView(body.path, body.sessionId, userId, body.durationMs, body.referrer ?? null);\n    return reply.send({ ok: true });\n  });\n\n  app.get('/analytics/dashboard', async (req, reply) => {\n    const days = Number((req.query as any).days) || 30;\n    return reply.send(await service.getDashboard(days));\n  });\n\n  app.get('/analytics/recent', async (req, reply) => {\n    const limit = Math.min(Number((req.query as any).limit) || 50, 200);\n    return reply.send({ events: await service.getRecentActivity(limit) });\n  });\n\n  app.get('/analytics/live', async (req, reply) => {\n    return reply.send({ live: await service.getLiveEvents(10) });\n  });\n}\n```\n\n---\n\n## Violation 4 \u0432\u0402\u201d Business Logic in the Infrastructure Layer (MODERATE)\n\n**Where:** `repository.ts` lines 18\u0432\u0402\u201c48 (`getDashboardStats`)\n\n```typescript\n// repository.ts\nasync getDashboardStats(fromDate: Date): Promise<DashboardStats> {\n  const rows = await db.select().from(pageViews).where(...);\n\n  // All of this is business logic, not data access:\n  const totalViews = rows.length;\n  const uniqueSessions = new Set(rows.map(r => r.sessionId)).size;\n  const bounces = Object.values(sessionPageCounts).filter(c => c === 1).length;\n  const bounceRate = uniqueSessions > 0 ? bounces / uniqueSessions : 0;\n  const topPages = Object.entries(pathStats)\n    .map(...)\n    .sort(...)\n    .slice(0, 10);\n  ...\n}\n```\n\n**Why it violates onion architecture:**\nThe repository's responsibility is data access: issue queries, map rows to domain objects, return them. The computation of `bounceRate`, the aggregation of `topPages`, the definition of what constitutes a \"bounce\" \u0432\u0402\u201d these are business rules that belong in the Application layer (inside `AnalyticsService.getDashboard`) or, if they become complex enough, in a domain service. Placing them in the repository:\n\n- Prevents reuse: a different use case that wants just the raw views cannot get them without triggering the full aggregation.\n- Makes the business logic impossible to unit-test without database fixtures.\n- Violates single-responsibility: the repository now knows about analytics business semantics, not just data storage.\n\n**Fix:**\nSplit the repository into pure data access, and move aggregation into the service (or a domain service/helper):\n\n```typescript\n// repository.ts \u0432\u0402\u201d data access only\nasync getViewsSince(fromDate: Date): Promise<PageView[]> {\n  const rows = await db.select().from(pageViews).where(gte(pageViews.timestamp, fromDate));\n  return rows.map(toPageView);\n}\n\n// service.ts \u0432\u0402\u201d business computation\nasync getDashboard(days: number = 30): Promise<DashboardStats> {\n  const fromDate = new Date();\n  fromDate.setDate(fromDate.getDate() - days);\n  const views = await this.repo.getViewsSince(fromDate);\n  return computeDashboardStats(views);  // pure function, easily unit-tested\n}\n\n// domain/stats.ts \u0432\u0402\u201d pure domain function (no imports, no DB)\nexport function computeDashboardStats(views: PageView[]): DashboardStats { ... }\n```\n\n---\n\n## Violation 5 \u0432\u0402\u201d Missing Port Interface in Domain Layer (MODERATE)\n\n**Related to Violation 1.** The `domain/` folder contains only `types.ts` with three data shapes (`PageView`, `DashboardStats`, `RetentionRow`). There is no port interface (e.g., `AnalyticsPort`) defining what the repository contract should look like. Without a port:\n\n- The application layer has no stable contract to program against.\n- There is nothing to implement mocks from in tests.\n- The dependency inversion principle is structurally absent: no inner-layer interface exists for the outer layer to implement.\n\n**Fix:** Add `domain/ports.ts` as shown in Violation 1's fix. This is the prerequisite for every other fix.\n\n---\n\n## Violation 6 \u0432\u0402\u201d `AnalyticsRepository` Constructed Twice (MINOR)\n\n**Where:** `routes.ts` lines 17\u0432\u0402\u201c18\n\n```typescript\nconst service = new AnalyticsService();  // internally constructs a repo\nconst repo = new AnalyticsRepository();  // constructs a second, separate repo instance\n```\n\nTwo distinct repository instances are created: one inside `AnalyticsService` (via its no-arg constructor) and one directly in the route file. Any state that the repository might hold (connection references, caches) would be split across two independent objects. This is a consequence of Violations 1, 2, and 3 compounding \u0432\u0402\u201d fixing those three violations eliminates this one automatically, since the container will manage exactly one instance.\n\n---\n\n## Quick Checklist Results\n\n| Check | Result |\n|---|---|\n| No `drizzle-orm` or `fastify` imports in domain files | PASS \u0432\u0402\u201d `domain/types.ts` is clean |\n| No `$inferSelect` types used outside repository files | PASS \u0432\u0402\u201d not present |\n| Routes are thin (validate, context, delegate, respond) | FAIL \u0432\u0402\u201d `/analytics/live` has raw Drizzle query; `/analytics/recent` calls repo directly |\n| Services throw domain errors, not HTTP errors | PASS \u0432\u0402\u201d no HTTP errors in service |\n| No cross-module internal imports | PASS \u0432\u0402\u201d analytics does not import from sibling modules |\n| Container not passed into domain services | PASS \u0432\u0402\u201d Container is not passed in; but the flip side is the service constructs its own deps |\n| Repository methods return domain entities | PASS \u0432\u0402\u201d `getRecentViews` returns `PageView[]` (domain type) |\n| New interfaces defined in inner layers, implementations in outer layers | FAIL \u0432\u0402\u201d no port interface exists; service depends on concrete class |\n\n---\n\n## Priority Fix Order\n\n1. **Add `domain/ports.ts`** \u0432\u0402\u201d prerequisite for everything else.\n2. **Fix `service.ts`** \u0432\u0402\u201d inject `AnalyticsPort` via constructor; remove internal `new AnalyticsRepository()`.\n3. **Fix `routes.ts`** \u0432\u0402\u201d remove all infrastructure imports; remove direct repo instantiation; add `getLiveEvents` delegation.\n4. **Move dashboard aggregation** from `repository.ts` to `service.ts` / a domain helper function.\n5. **Register in container** \u0432\u0402\u201d add `analyticsService` getter in `platform/container.ts`.\n\nNone of these changes affect the public HTTP API surface. The `/analytics/track`, `/analytics/dashboard`, `/analytics/recent`, and `/analytics/live` endpoints will behave identically \u0432\u0402\u201d they will simply be backed by a correctly layered implementation.\n"}], "grading": null}, {"id": "eval-2-application-bypasses-port-without_skill", "prompt": "We're doing a pre-merge architecture review of the analytics module. The team built it quickly and I want a second set of eyes before it lands in main. What do you see?", "eval_id": 2, "outputs": [{"name": "review.md", "type": "text", "content": "# Architecture Review: Analytics Module (Pre-Merge)\n\n## Summary\n\nThe analytics module has a solid foundation \u0432\u0402\u201d the domain types are clean, the repository does real persistence work, and the service provides a reasonable use-case facade. However, there are several layering violations and design issues that should be addressed before this lands in main. The most serious is in `routes.ts`, which bypasses both service and repository and queries the database directly. There are also structural coupling problems throughout.\n\n---\n\n## Finding 1 \u0432\u0402\u201d Routes Layer Bypasses Application Layer (CRITICAL)\n\n**File:** `routes.ts`, lines 5\u0432\u0402\u201c7, 39\u0432\u0402\u201c46\n\n```ts\nimport { db } from '../../db';\nimport { pageViews } from '../../db/schema';\nimport { desc } from 'drizzle-orm';\n// ...\nconst rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);\n```\n\nThe `/analytics/live` route imports the Drizzle `db` singleton and the `pageViews` schema table directly and executes a raw query. This violates the fundamental onion rule that outer layers may only call inward through defined ports. The routes layer (HTTP delivery) should never know about database internals.\n\nAdditionally, the `/analytics/recent` route calls `repo.getRecentViews()` directly rather than going through the service:\n\n```ts\nconst repo = new AnalyticsRepository();\n// ...\nconst events = await repo.getRecentViews(limit);\n```\n\nThis means the route layer has a direct dependency on a concrete infrastructure class, bypassing any application logic the service layer might provide.\n\n**Impact:** Business logic scattered across layers, impossible to unit-test routes without a real database, and any future caching/auditing/rate-limiting that belongs in the service will be silently skipped for these two endpoints.\n\n**Fix:**\n1. Add a `getLiveActivity(limit: number): Promise<PageView[]>` method to `AnalyticsService`.\n2. Move the raw query to `AnalyticsRepository.getLiveViews(limit)`.\n3. Remove `db`, `pageViews`, and `desc` imports from `routes.ts`.\n4. Remove the `repo` instantiation from `routes.ts` \u0432\u0402\u201d the route layer should only hold a reference to the service.\n\n---\n\n## Finding 2 \u0432\u0402\u201d Service Hard-Codes Its Own Dependency (HIGH)\n\n**File:** `service.ts`, lines 7\u0432\u0402\u201c9\n\n```ts\nconstructor() {\n  this.repo = new AnalyticsRepository();\n}\n```\n\n`AnalyticsService` instantiates `AnalyticsRepository` directly inside its constructor. This is constructor-side coupling: the service controls its own infrastructure dependency, making it impossible to swap implementations, mock the repository in unit tests, or apply dependency injection at the composition root.\n\n**Impact:** Any test of `AnalyticsService` in isolation will hit the real database. The repository cannot be replaced with an in-memory or test double without modifying production source.\n\n**Fix:** Accept the repository through constructor injection, typed against an interface (port):\n\n```ts\n// domain/ports.ts\nexport interface IAnalyticsRepository {\n  record(view: PageView): Promise<void>;\n  getDashboardStats(fromDate: Date): Promise<DashboardStats>;\n  getRecentViews(limit: number): Promise<PageView[]>;\n  getLiveViews(limit: number): Promise<PageView[]>;\n}\n\n// service.ts\nexport class AnalyticsService {\n  constructor(private readonly repo: IAnalyticsRepository) {}\n  // ...\n}\n```\n\nRegister and wire the concrete `AnalyticsRepository` at the module/composition-root level.\n\n---\n\n## Finding 3 \u0432\u0402\u201d Routes Also Hard-Codes Two Concrete Dependencies (HIGH)\n\n**File:** `routes.ts`, lines 17\u0432\u0402\u201c18\n\n```ts\nconst service = new AnalyticsService();\nconst repo = new AnalyticsRepository();\n```\n\nThe route factory creates its own service and repository instances. This duplicates the composition concern and sidesteps any DI container or module registration. There is no guarantee these instances share state with instances created elsewhere, and tests cannot inject alternatives.\n\n**Fix:** Accept `AnalyticsService` (and only the service \u0432\u0402\u201d see Finding 1) as a parameter to `analyticsRoutes`, or resolve it from Fastify's decorator/plugin system:\n\n```ts\nexport async function analyticsRoutes(app: FastifyInstance, opts: { service: AnalyticsService }) {\n  const { service } = opts;\n  // ...\n}\n```\n\n---\n\n## Finding 4 \u0432\u0402\u201d Repository Contains Aggregation / Business Logic (MEDIUM)\n\n**File:** `repository.ts`, lines 18\u0432\u0402\u201c48\n\n`getDashboardStats` fetches all rows since `fromDate` into memory and then computes bounce rate, unique sessions, unique users, top pages, and average duration in JavaScript. This is business-logic aggregation living inside the repository (infrastructure) layer.\n\n**Impact:**\n- On any non-trivial dataset, pulling every row since `fromDate` into the Node.js process will cause serious memory and latency problems.\n- Logic for what counts as a \"bounce\" or how top pages are ranked is a domain concern, not a persistence concern.\n\n**Fix:**\n1. Move aggregation logic into `AnalyticsService` or a dedicated `AnalyticsDomainService`.\n2. Push the heavy computations into SQL (COUNT, AVG, GROUP BY, window functions). The repository should return raw aggregated data from the DB, not raw rows for the app to crunch.\n3. Alternatively, keep a thin in-process path for small datasets but cap it with an explicit limit and document the constraint.\n\n---\n\n## Finding 5 \u0432\u0402\u201d No Port (Interface) Between Application and Infrastructure (MEDIUM)\n\nThere is no interface/port separating `AnalyticsService` from `AnalyticsRepository`. The service imports the concrete class directly:\n\n```ts\nimport { AnalyticsRepository } from './repository';\n```\n\nIn onion architecture, the application layer defines an inward-facing interface (port), and the infrastructure layer provides the outward-facing adapter that satisfies it. Without this boundary, the dependency arrow points the wrong way: application depends on infrastructure rather than infrastructure depending on application.\n\n**Fix:** Define `IAnalyticsRepository` in `domain/ports.ts` (or `application/ports.ts`) and have `AnalyticsRepository` implement it. See the code example under Finding 2.\n\n---\n\n## Finding 6 \u0432\u0402\u201d Loose Query Parameter Parsing in Routes (LOW)\n\n**File:** `routes.ts`, lines 28, 33\n\n```ts\nconst days = Number((req.query as any).days) || 30;\nconst limit = Math.min(Number((req.query as any).limit) || 50, 200);\n```\n\nThe `as any` casts bypass TypeScript's type system and Fastify's querystring schema validation. `Number(undefined)` is `NaN`, and `NaN || 30` silently falls back \u0432\u0402\u201d which is correct by accident. A non-numeric string like `\"abc\"` would also silently become the default, hiding bad inputs.\n\n**Fix:** Define Fastify JSON Schema (or Zod) querystring schemas for each route and declare them in the route options so Fastify validates and coerces inputs automatically. Remove the `as any` casts.\n\n---\n\n## Finding 7 \u0432\u0402\u201d `req.user` Cast to `any` (LOW)\n\n**File:** `routes.ts`, line 22\n\n```ts\nconst userId = (req.user as any)?.id ?? null;\n```\n\nCasting `req.user` to `any` loses type safety. If the user object shape ever changes, this silently passes `undefined` as `userId`.\n\n**Fix:** Extend Fastify's `FastifyRequest` type declaration to include the `user` property with its real type. Use proper TypeScript module augmentation rather than `any`.\n\n---\n\n## Layer Dependency Summary\n\n| Actual dependency | Correct direction | Violation? |\n|---|---|---|\n| `routes.ts` \u0432\u2020\u2019 `AnalyticsService` | Routes \u0432\u2020\u2019 Application | OK |\n| `routes.ts` \u0432\u2020\u2019 `AnalyticsRepository` | Routes \u0432\u2020\u2019 Infrastructure (skip application) | YES |\n| `routes.ts` \u0432\u2020\u2019 `db` / `pageViews` | Routes \u0432\u2020\u2019 DB internals (skip both layers) | YES (critical) |\n| `AnalyticsService` \u0432\u2020\u2019 `AnalyticsRepository` (concrete) | Application \u0432\u2020\u2019 Infrastructure (no port) | YES |\n| `AnalyticsRepository` \u0432\u2020\u2019 domain types | Infrastructure \u0432\u2020\u2019 Domain | OK |\n| `AnalyticsService` \u0432\u2020\u2019 domain types | Application \u0432\u2020\u2019 Domain | OK |\n\n---\n\n## Recommended Remediation Order\n\n1. **Immediate (block merge):** Remove `db` and `pageViews` imports from `routes.ts`. Add `getLiveViews` to the repository and a corresponding service method.\n2. **Before merge:** Remove `AnalyticsRepository` import from `routes.ts`. Route layer should depend only on `AnalyticsService`.\n3. **Before merge:** Inject `AnalyticsService` into `analyticsRoutes` rather than constructing it inline.\n4. **Short-term:** Extract `IAnalyticsRepository` port. Inject into `AnalyticsService` via constructor.\n5. **Short-term:** Push aggregation SQL into the DB; keep domain logic in the service, not the repository.\n6. **Follow-up:** Add typed querystring schemas and remove `as any` casts.\n"}], "grading": null}, {"id": "eval-3-fat-controller-with_skill", "prompt": "The billing module shipped last sprint. Can you do an architecture review on it and let me know if there are structural issues we should address before the codebase grows?", "eval_id": 3, "outputs": [{"name": "review.md", "type": "text", "content": "# Architecture Review: Billing Module\n\n**File reviewed:** `modules/billing/routes.ts`\n**Skill applied:** Onion Architecture\n**Date:** 2026-08-19\n\n---\n\n## Summary\n\nThe billing module, as shipped, is a textbook example of the **Fat Controller** anti-pattern. Every route handler in `routes.ts` performs direct database access, calls the Stripe API directly, implements business logic, and manages state transitions \u0432\u0402\u201d all without a service layer, a repository, or any domain abstraction. This is the most structurally damaging pattern to have in a growing codebase because it makes the billing logic untestable, tightly coupled to Stripe's SDK, and impossible to reuse.\n\nThe module currently has **zero correct layers**. It is a single-file flat structure where the presentation layer contains all of the infrastructure and application responsibilities.\n\n---\n\n## Violations Found\n\n### 1. Fat Controllers (Critical \u0432\u0402\u201d Anti-Pattern #3)\n\n**All six route handlers** violate the presentation layer rule. Routes must only: validate input, resolve context, delegate to a service, and format the response. Instead, every handler in this file implements multi-step business workflows.\n\n**`GET /billing/subscription`** \u0432\u0402\u201d retrieves the local subscription record, then calls `stripe.subscriptions.retrieve()`, computes `daysLeft`, derives `isActive`, and extracts `planName`. This is application-layer orchestration and domain computation sitting in the route handler.\n\n**`POST /billing/subscribe`** \u0432\u0402\u201d fetches the user row, checks for an existing Stripe customer ID, conditionally creates a Stripe customer, creates a Stripe subscription, upserts the local `subscriptions` row, and extracts the client secret from the expanded invoice. This is a multi-step use case with conditional branching and side effects \u0432\u0402\u201d 40+ lines of business flow in a route handler.\n\n**`POST /billing/cancel`** \u0432\u0402\u201d fetches the subscription, cancels it in Stripe, updates the local record, then fetches the user row purely to log their email. All of this belongs in a service.\n\n**`GET /billing/invoices`** \u0432\u0402\u201d fetches local subscription to get the Stripe customer ID, lists invoices from Stripe, maps the Stripe response to insert rows, performs a DB upsert, but then returns the raw Stripe API objects (not the local DB rows). This is a mixed cache-write / response-from-source pattern that creates data consistency confusion and belongs entirely in the application layer.\n\n**`POST /billing/webhook`** \u0432\u0402\u201d implements a Stripe webhook event dispatcher with three event-type branches, each performing direct DB writes. Webhook handling is application-layer domain logic \u0432\u0402\u201d it processes external events and applies state transitions.\n\n**`GET /billing/portal`** \u0432\u0402\u201d the simplest handler but still makes a direct Stripe API call inside the route.\n\n---\n\n### 2. Direct Database Access in Routes (Critical \u0432\u0402\u201d Dependency Rule Violation)\n\n`routes.ts` imports directly from the database layer:\n\n```typescript\nimport { eq, and, desc } from 'drizzle-orm';\nimport { db } from '../../db';\nimport { subscriptions, invoices, users } from '../../db/schema';\n```\n\nPer the dependency rule, `routes.ts` must never import from `drizzle-orm` or `../../db/schema`. These are infrastructure-layer concerns. The presentation layer is only permitted to depend on the application layer (services). Direct DB access in a route means:\n\n- The route is doing repository work.\n- The database schema is directly coupled to the HTTP response shape.\n- There is no isolation point for testing routes without a real database.\n\n---\n\n### 3. Infrastructure Client Instantiated as a Module-Level Singleton (Critical)\n\n```typescript\nconst stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' });\n```\n\nThe Stripe client is constructed at module load time using `process.env` directly, bypassing the project's `SecretsProvider`. This violates two rules:\n\n1. **Secrets must flow through `SecretsProvider`**, not `process.env` (per `CLAUDE.md` project conventions).\n2. **Infrastructure clients belong in the infrastructure layer**, constructed by the Container (composition root), not hardcoded in the presentation layer.\n\nThe `STRIPE_WEBHOOK_SECRET` is also read via `process.env` inside the webhook handler, which is the same violation.\n\n---\n\n### 4. No Service Layer (Critical \u0432\u0402\u201d Missing Application Layer)\n\nThe billing module has no `service.ts`. There is no application layer at all. The use cases that should exist as named methods on a `BillingService` class are:\n\n- `getSubscription(userId)` \u0432\u0402\u201d retrieves and enriches subscription data\n- `subscribe(userId, priceId)` \u0432\u0402\u201d creates or upgrades a subscription\n- `cancel(userId)` \u0432\u0402\u201d cancels an active subscription\n- `listInvoices(userId)` \u0432\u0402\u201d fetches and caches invoice history\n- `createPortalSession(userId)` \u0432\u0402\u201d generates a Stripe billing portal URL\n- `handleWebhookEvent(event)` \u0432\u0402\u201d dispatches Stripe webhook events to state transitions\n\nWithout a service layer, none of these use cases can be tested in isolation, reused by other parts of the application (e.g., an admin panel, a job, a CLI), or swapped for a different payment provider.\n\n---\n\n### 5. No Repository Layer (Significant \u0432\u0402\u201d Missing Infrastructure Abstraction)\n\nThe billing module performs raw Drizzle queries in six places. There is no `BillingRepository` that encapsulates these queries. The same query pattern \u0432\u0402\u201d `db.select().from(subscriptions).where(eq(subscriptions.userId, userId))` \u0432\u0402\u201d appears four times across different handlers with no reuse.\n\nA `BillingRepository` should expose:\n\n```typescript\ninterface BillingRepository {\n  findSubscriptionByUserId(userId: string): Promise<Subscription | undefined>;\n  upsertSubscription(data: InsertSubscription): Promise<void>;\n  updateSubscriptionStatus(stripeId: string, status: string): Promise<void>;\n  cancelSubscription(id: string): Promise<void>;\n  upsertInvoices(invoices: InsertInvoice[]): Promise<void>;\n}\n```\n\n---\n\n### 6. No Domain Types \u0432\u0402\u201d Raw DB Row Types Used as Domain Models (Significant \u0432\u0402\u201d Anti-Pattern #4)\n\nThe code works entirely with raw `typeof subscriptions.$inferSelect` row shapes and raw `Stripe.*` types. There are no domain entities for `Subscription`, `Invoice`, or billing concepts. This means:\n\n- If the `subscriptions` table schema changes, every route handler must be updated.\n- If the payment provider changes from Stripe to another vendor, every route handler must change.\n- Business concepts like \"is this subscription active?\" are computed inline in route handlers as ad-hoc expressions rather than being named domain behaviors.\n\n---\n\n### 7. No Input Validation via Zod Schemas (Moderate)\n\nThe `POST /billing/subscribe` handler uses an unsafe type cast instead of Zod validation:\n\n```typescript\nconst { priceId } = req.body as { priceId: string };\n```\n\nPer DevDigest convention, request bodies must be validated via Zod schemas in the route's schema config using `fastify-type-provider-zod`. The `as` cast bypasses type safety and validation entirely.\n\n---\n\n### 8. Type Safety Bypassed with `as any` (Moderate)\n\nThree uses of `as any` suppress TypeScript's type checker:\n\n```typescript\nconst userId = (req.user as any).id;         // in every handler\nconst invoice = stripeSub.latest_invoice as any;  // in subscribe handler\n```\n\nThe `req.user` cast indicates the auth decorator's type is not being surfaced correctly. This should be resolved by augmenting the Fastify request type via declaration merging. The `latest_invoice as any` cast to extract `payment_intent.client_secret` should use a properly typed Stripe expand pattern.\n\n---\n\n### 9. Webhook Handler Has No Security Boundary (Moderate)\n\nThe webhook endpoint calls `stripe.webhooks.constructEvent()` correctly for signature verification, but the handler is registered without any middleware exclusion for the auth check. If the standard Fastify auth hook applies to all routes, the webhook will fail because Stripe does not send user credentials. The raw body requirement for signature verification also needs explicit configuration.\n\n---\n\n### 10. Dunning Flow Is a Stub with No Implementation Path (Minor)\n\n```typescript\napp.log.warn(`Payment failed for user ${user.email} \u0432\u0402\u201d trigger dunning flow`);\n```\n\nThe `invoice.payment_failed` branch logs a warning but takes no action. This is acceptable for an MVP, but the comment \"trigger dunning flow\" embedded as a log string (rather than a `// TODO` comment or an event emission) suggests the placeholder will be forgotten. The correct approach is to emit a domain event or enqueue a job from the application layer.\n\n---\n\n## Refactoring Blueprint\n\nThe module should be restructured into proper onion layers:\n\n```\nmodules/billing/\n  domain/\n    entities.ts          # Subscription, Invoice types (no Drizzle, no Stripe)\n    ports.ts             # BillingRepository interface, StripeClient port interface\n  service.ts             # BillingService \u0432\u0402\u201d 6 use-case methods\n  repository.ts          # DrizzleBillingRepository implements BillingRepository\n  stripe-adapter.ts      # StripeClient adapter (wraps Stripe SDK)\n  routes.ts              # Thin Fastify routes \u0432\u0402\u201d validate, context, delegate, respond\n```\n\n### What a correctly layered route handler looks like:\n\n```typescript\n// AFTER refactoring \u0432\u0402\u201d routes.ts\napp.get('/billing/subscription', async (req, reply) => {\n  const { userId } = await getContext(app.container, req);\n  const result = await service.getSubscription(userId);\n  if (!result) return reply.send({ active: false, plan: null, daysLeft: 0 });\n  return reply.send(result);\n});\n\napp.post('/billing/subscribe', {\n  schema: { body: SubscribeInput }  // Zod schema\n}, async (req, reply) => {\n  const { userId } = await getContext(app.container, req);\n  const result = await service.subscribe(userId, req.body.priceId);\n  return reply.status(201).send(result);\n});\n```\n\n### What the service layer should encapsulate:\n\n```typescript\n// service.ts \u0432\u0402\u201d Application layer\nexport class BillingService {\n  constructor(\n    private repo: BillingRepository,     // domain port\n    private stripe: StripeClient,        // domain port (not Stripe SDK directly)\n    private secrets: SecretsProvider,\n  ) {}\n\n  async subscribe(userId: string, priceId: string): Promise<SubscribeResult> {\n    // All current route handler logic lives here\n  }\n\n  async handleWebhookEvent(rawBody: Buffer, signature: string): Promise<void> {\n    // Webhook dispatch logic lives here\n  }\n}\n```\n\n---\n\n## Priority Order for Remediation\n\n| Priority | Action |\n|----------|--------|\n| 1 (Critical) | Create `BillingService` \u0432\u0402\u201d extract all use-case logic out of route handlers |\n| 2 (Critical) | Create `BillingRepository` \u0432\u0402\u201d extract all Drizzle queries into one class |\n| 3 (Critical) | Create `StripeClient` port \u0432\u0402\u201d inject via Container, read secret via `SecretsProvider` |\n| 4 (High) | Define domain types `Subscription` and `Invoice` \u0432\u0402\u201d decouple from DB row types |\n| 5 (High) | Add Zod request schemas \u0432\u0402\u201d replace `as { priceId: string }` cast |\n| 6 (Moderate) | Fix `req.user` typing \u0432\u0402\u201d Fastify type augmentation for the auth decorator |\n| 7 (Moderate) | Clarify webhook auth exclusion and raw body parsing |\n| 8 (Low) | Replace dunning log stub with a job enqueue or domain event |\n\n---\n\n## Conclusion\n\nThe billing module has no onion layering at all \u0432\u0402\u201d it is a single-file script masquerading as a route plugin. Every structural anti-pattern in the onion architecture rule set is present. Before the codebase grows, the module needs a service layer and a repository layer at minimum. The Stripe client must be moved to an adapter injected through the Container. Until these changes are made, the billing module cannot be unit tested, cannot be refactored safely, and will accumulate business logic debt rapidly as requirements evolve.\n"}], "grading": null}, {"id": "eval-3-fat-controller-without_skill", "prompt": "The billing module shipped last sprint. Can you do an architecture review on it and let me know if there are structural issues we should address before the codebase grows?", "eval_id": 3, "outputs": [{"name": "review.md", "type": "text", "content": "# Architecture Review: Billing Module\n\n**File reviewed:** `modules/billing/routes.ts`\n**Reviewer:** Claude (architecture review agent)\n**Date:** 2026-08-19\n\n---\n\n## Summary\n\nThe billing module is implemented as a single \"fat controller\" \u0432\u0402\u201d all business logic, data access, and external API orchestration lives directly inside Fastify route handlers. While this pattern can work for very small proof-of-concept code, it creates significant structural debt that compounds quickly as the module grows. The issues identified below range from layer-boundary violations to missing error handling and testability gaps.\n\n---\n\n## Structural Issues\n\n### 1. No Service or Domain Layer (Critical)\n\nEvery route handler directly imports and calls `stripe.*` and `db.*`. There is no intermediate layer that encapsulates business logic. This violates the single-responsibility principle at the module level and makes the entire billing feature impossible to unit-test without hitting real databases and external APIs.\n\n**What is missing:**\n- A `BillingService` (or equivalent application-layer class) that owns orchestration logic such as \"create or retrieve Stripe customer, create subscription, persist record.\"\n- A repository or data-access layer that wraps the Drizzle queries so they can be swapped or mocked in tests.\n- A domain model or value objects for concepts like `Subscription` and `Invoice` rather than raw DB rows and Stripe SDK objects scattered through handler code.\n\n**Impact:** Any change to subscription creation logic (e.g., adding trial periods, applying coupons) requires touching route-handler code, which should be concerned only with HTTP concerns (parsing, validation, response shaping).\n\n---\n\n### 2. Stripe Client Instantiated as a Module-Level Singleton (High)\n\n```ts\nconst stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' });\n```\n\nThe Stripe client is instantiated at module load time using `process.env` directly. This:\n\n- Bypasses the project's `SecretsProvider` convention (secrets should not come from `process.env` directly per project conventions).\n- Makes it impossible to inject a mock Stripe client in tests \u0432\u0402\u201d there is no seam.\n- Hard-codes the API version as a string literal inside route registration code.\n\n**Recommendation:** Instantiate the Stripe client inside a `StripeAdapter` class that accepts the key via constructor injection (from `SecretsProvider`). Register it as a Fastify plugin/decorator so it can be overridden in tests.\n\n---\n\n### 3. Input Validation Is Absent (High)\n\n```ts\nconst { priceId } = req.body as { priceId: string };\n```\n\nThe `POST /billing/subscribe` handler casts `req.body` to a type with no runtime validation. If `priceId` is missing, malformed, or injected, this passes a potentially undefined or malicious string directly to `stripe.subscriptions.create`. The same pattern applies to the webhook handler's header parsing.\n\n**Recommendation:** Define Zod schemas (or JSON Schema objects) for every request body and register them via Fastify's `schema` property on the route. Fastify will reject invalid payloads before the handler runs.\n\n---\n\n### 4. `req.user` Typed as `any` Across All Handlers (High)\n\n```ts\nconst userId = (req.user as any).id;\n```\n\nThis pattern appears in every authenticated route. Casting to `any` defeats TypeScript's safety guarantees. If the auth plugin changes the shape of `req.user`, this code silently breaks at runtime.\n\n**Recommendation:** Extend Fastify's `FastifyRequest` interface via declaration merging to include a properly typed `user` property. This is a one-line change in a shared types file and eliminates all these casts.\n\n---\n\n### 5. Cross-Concern Data Fetching \u0432\u0402\u201d User Loaded Inside Cancel Handler (Medium)\n\n```ts\nawait stripe.subscriptions.cancel(sub.stripeId);\nawait db.update(subscriptions).set({ status: 'cancelled', ... }).where(...);\nconst [user] = await db.select().from(users).where(eq(users.id, userId));\napp.log.info(`Subscription cancelled for ${user.email}`);\n```\n\nThe cancel handler loads the user record *after* the cancellation solely for logging purposes. This is an unnecessary DB query in the hot path (the user's email has nothing to do with the cancel operation itself). It also introduces a subtle ordering issue: if the `db.update` or the final `db.select` fails, the Stripe cancellation has already been executed with no compensation.\n\n**Recommendation:** Move logging concerns out of route handlers. If the email is needed for an audit trail, pass it via a structured log context object populated at authentication time (available on `req.user`). Address the partial-failure risk with a try/catch or by moving Stripe calls inside a transaction wrapper.\n\n---\n\n### 6. GET /billing/invoices Performs a Write as a Side Effect (Medium)\n\n```ts\napp.get('/billing/invoices', async (req, reply) => {\n  // ...fetches from Stripe...\n  await db.insert(invoices).values(toUpsert).onConflictDoNothing();\n  return reply.send({ invoices: stripeInvoices.data });\n});\n```\n\nA GET endpoint that silently upserts records into the database violates HTTP semantics (GET must be idempotent and safe). It also means the response payload (raw Stripe objects) diverges from what was persisted (a mapped subset). Callers cannot rely on the DB as a consistent source of truth.\n\n**Recommendation:** Separate the sync concern from the read concern. Either use a background job (or a dedicated `POST /billing/invoices/sync` endpoint) to populate the local `invoices` table, or query the local table and return those records (with a separate sync path).\n\n---\n\n### 7. Webhook Handler Uses a Bare `if` Chain Instead of a Typed Dispatch Table (Low-Medium)\n\nThe webhook handler uses three sequential `if` statements. As more Stripe event types are handled (payment succeeded, trial ending, etc.), this block will grow into a maintenance burden with no clear boundaries between event concerns.\n\n**Recommendation:** Extract each event type into its own named handler function (or move them to a dedicated `WebhookService`). Use an event-type dispatch map for readability and extensibility.\n\n---\n\n### 8. No Error Handling for Stripe API Failures (High)\n\nNone of the route handlers wrap Stripe SDK calls in try/catch blocks. A `stripe.subscriptions.retrieve` timeout or a rate-limit error from Stripe will result in an unhandled rejection propagating up to Fastify's global error handler, which will return a generic 500. Callers receive no actionable information, and the error will not be categorized as a third-party dependency failure.\n\n**Recommendation:** Wrap all external API calls in try/catch. Distinguish between Stripe errors (e.g., `StripeCardError`, `StripeRateLimitError`) and internal errors. Return appropriate HTTP status codes and structured error responses. Consider a dedicated error-mapping layer in the Stripe adapter.\n\n---\n\n### 9. `process.env.APP_URL` Read Inline in a Route Handler (Low)\n\n```ts\nreturn_url: `${process.env.APP_URL}/settings/billing`,\n```\n\nConfiguration values are accessed ad-hoc from `process.env` inside handler bodies. This makes configuration surface area invisible and untestable.\n\n**Recommendation:** Centralize all configuration (non-secret values) in a typed config object loaded once at startup. Inject it via Fastify decorators or a service locator.\n\n---\n\n## Missing Layers Summary\n\n| Layer | Expected | Present |\n|---|---|---|\n| Domain model (Subscription, Invoice value objects) | Yes | No |\n| Application service (BillingService) | Yes | No |\n| Repository / data-access abstraction | Yes | No |\n| External adapter (StripeAdapter) | Yes | No |\n| Request validation (Zod / JSON Schema) | Yes | No (partial cast only) |\n| Route handler (HTTP orchestration) | Yes | Yes (but overloaded) |\n\n---\n\n## Recommended Refactoring Path\n\n1. **Extract a `StripeAdapter`** \u0432\u0402\u201d wraps the Stripe SDK, accepts injected credentials, maps Stripe errors to domain errors.\n2. **Extract a `BillingRepository`** \u0432\u0402\u201d owns all Drizzle queries for `subscriptions` and `invoices`. Returns typed domain objects, not raw DB rows.\n3. **Create a `BillingService`** \u0432\u0402\u201d orchestrates adapter + repository calls. Contains all business logic (create-or-get-customer, cancel-with-status-update, etc.).\n4. **Add Zod schemas for all request bodies** \u0432\u0402\u201d registered on each route for automatic validation.\n5. **Fix `req.user` typing** \u0432\u0402\u201d one augmentation in a shared types file.\n6. **Separate the invoice sync concern** \u0432\u0402\u201d move the upsert out of the GET handler.\n7. **Add Stripe error handling** \u0432\u0402\u201d try/catch with typed error mapping in the adapter.\n\nThe route file should shrink to pure HTTP concerns: parse validated input, call the service, shape the response. All other logic belongs in the layers above.\n"}], "grading": null}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "onion-architecture", "skill_path": "<path/to/skill>", "executor_model": "<model-name>", "analyzer_model": "<model-name>", "timestamp": "2026-08-19T11:41:39Z", "evals_run": [1, 2, 3], "runs_per_configuration": 3}, "runs": [{"eval_id": 1, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 88.7, "tokens": 9851, "tool_calls": 9, "errors": 0}, "expectations": [{"text": "Identifies that the domain layer (NotificationService.ts) imports from infrastructure (db or drizzle-orm)", "passed": true, "evidence": "Violation 1 is titled 'Domain Layer Imports Infrastructure (CRITICAL)' and quotes the exact imports: `import { eq, and } from 'drizzle-orm';`, `import { db } from '../../../db';`, `import { notifications } from '../../../db/schema';` from NotificationService.ts lines 1\u0432\u0402\u201c3."}, {"text": "Names the dependency rule violation explicitly \u0432\u0402\u201d domain should have zero external dependencies", "passed": true, "evidence": "\"The domain layer is the innermost ring of the onion. It must have **zero external dependencies** \u0432\u0402\u201d no Drizzle, no Fastify, no npm packages.\""}, {"text": "Suggests introducing a repository interface in the domain layer", "passed": true, "evidence": "Fix section proposes creating `domain/ports.ts` with `export interface NotificationRepository { findUnread, countUnread, markRead, markAllRead, create, deleteReadOlderThan }`. Remediation step 2: \"Create `domain/ports.ts` \u0432\u0402\u201d define `NotificationRepository` interface with domain-typed method signatures.\""}, {"text": "Suggests moving Drizzle logic to a separate repository/infrastructure file", "passed": true, "evidence": "Fix section proposes creating `infrastructure/NotificationRepository.ts` with `export class DrizzleNotificationRepository implements NotificationRepository` containing all Drizzle queries. Remediation step 3: \"Create `infrastructure/NotificationRepository.ts` \u0432\u0402\u201d move all Drizzle code here, implementing the port.\""}, {"text": "Notes that routes.ts instantiates the service directly rather than using a composition root", "passed": true, "evidence": "Violation 2 states: \"`routes.ts` calls `new NotificationService()` directly, hard-wiring the concrete class into the presentation layer\" and \"Bypasses the composition root: `platform/container.ts` is the designated wiring point for the project. Creating service instances in route files circumvents this pattern.\""}], "notes": []}, {"eval_id": 2, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 102.8, "tokens": 8388, "tool_calls": 11, "errors": 0}, "expectations": [{"text": "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface", "passed": true, "evidence": "Violation 1: 'import { AnalyticsRepository } from './repository';   // imports the CONCRETE class' \u0432\u0402\u201d 'The Application layer (service.ts) must depend on an interface (port) defined in the Domain layer, not on a concrete infrastructure class.'"}, {"text": "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)", "passed": true, "evidence": "Violation 2: 'constructor() { this.repo = new AnalyticsRepository(); }' \u0432\u0402\u201d 'The composition root (platform/container.ts) is the only place that should construct concrete implementations... When a service constructs its own collaborators, it bypasses the container entirely. This is the service locator anti-pattern.'"}, {"text": "Identifies that routes.ts imports AnalyticsRepository directly (presentation \u0432\u2020\u2019 infrastructure violation)", "passed": true, "evidence": "Violation 3: 'import { AnalyticsRepository } from './repository';  // infrastructure import in presentation' \u0432\u0402\u201d 'The Presentation layer (routes.ts) must depend on the Application layer only. It must not import from infrastructure (repository.ts, db/schema, drizzle-orm) or bypass the service layer.'"}, {"text": "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer", "passed": true, "evidence": "Violation 3: '/analytics/live bypasses ALL layers \u0432\u0402\u201d raw SQL query in a route handler' with code showing 'const rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);' inside the route handler."}, {"text": "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer", "passed": true, "evidence": "Violation 5 and Fix for Violation 1: 'Add domain/ports.ts as shown in Violation 1's fix. This is the prerequisite for every other fix.' \u0432\u0402\u201d provides concrete interface: 'export interface AnalyticsPort { record(view: PageView): Promise<void>; getDashboardStats(fromDate: Date): Promise<DashboardStats>; getRecentViews(limit: number): Promise<PageView[]>; }'"}], "notes": []}, {"eval_id": 3, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 6, "failed": 0, "total": 6, "time_seconds": 89.8, "tokens": 8741, "tool_calls": 9, "errors": 0}, "expectations": [{"text": "Identifies the fat controller / missing service layer anti-pattern", "passed": true, "evidence": "The billing module, as shipped, is a textbook example of the Fat Controller anti-pattern. Every route handler in routes.ts performs direct database access, calls the Stripe API directly, implements business logic, and manages state transitions \u0432\u0402\u201d all without a service layer, a repository, or any domain abstraction."}, {"text": "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers", "passed": true, "evidence": "GET /billing/subscription \u0432\u0402\u201d retrieves the local subscription record, then calls stripe.subscriptions.retrieve(), computes daysLeft, derives isActive, and extracts planName. This is application-layer orchestration and domain computation sitting in the route handler."}, {"text": "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer", "passed": true, "evidence": "GET /billing/portal \u0432\u0402\u201d the simplest handler but still makes a direct Stripe API call inside the route. Also: Infrastructure clients belong in the infrastructure layer, constructed by the Container (composition root), not hardcoded in the presentation layer."}, {"text": "Flags direct DB queries (db.select, db.update) in route handlers", "passed": true, "evidence": "routes.ts imports directly from the database layer: import { eq, and, desc } from 'drizzle-orm'; import { db } from '../../db'; import { subscriptions, invoices, users } from '../../db/schema'; Per the dependency rule, routes.ts must never import from drizzle-orm or ../../db/schema."}, {"text": "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)", "passed": true, "evidence": "Priority 1 (Critical): Create BillingService \u0432\u0402\u201d extract all use-case logic out of route handlers. Priority 2 (Critical): Create BillingRepository \u0432\u0402\u201d extract all Drizzle queries into one class. Also includes a full code sample for BillingService class and BillingRepository interface."}, {"text": "Notes the missing composition root / dependency injection", "passed": true, "evidence": "Infrastructure clients belong in the infrastructure layer, constructed by the Container (composition root), not hardcoded in the presentation layer. The service.ts code sample shows: constructor(private repo: BillingRepository, private stripe: StripeClient, private secrets: SecretsProvider) and the refactored route uses await getContext(app.container, req)."}], "notes": []}, {"eval_id": 1, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 66.6, "tokens": 7098, "tool_calls": 5, "errors": 0}, "expectations": [{"text": "Identifies that the domain layer (NotificationService.ts) imports from infrastructure (db or drizzle-orm)", "passed": true, "evidence": "Critical Issue #1 heading: 'Domain Layer Directly Imports Infrastructure (Drizzle + DB Connection)' with quoted imports: \"import { eq, and } from 'drizzle-orm'; import { db } from '../../../db'; import { notifications } from '../../../db/schema';\""}, {"text": "Names the dependency rule violation explicitly \u0432\u0402\u201d domain should have zero external dependencies", "passed": true, "evidence": "\"In a properly layered architecture (Onion / Clean / Hexagonal), the domain layer must have zero knowledge of how data is persisted. It should define interfaces (ports) that infrastructure implementations fulfill.\""}, {"text": "Suggests introducing a repository interface in the domain layer", "passed": true, "evidence": "Fix section shows: \"// domain/INotificationRepository.ts\\nexport interface INotificationRepository { findUnreadByUser(userId: string): Promise<Notification[]>; ... }\" and recommended structure includes 'INotificationRepository.ts # Port (interface)' under domain/"}, {"text": "Suggests moving Drizzle logic to a separate repository/infrastructure file", "passed": true, "evidence": "Fix section shows: \"// infrastructure/DrizzleNotificationRepository.ts\\nimport { eq, and } from 'drizzle-orm'; ... export class DrizzleNotificationRepository implements INotificationRepository { // ... all Drizzle queries live here }\""}, {"text": "Notes that routes.ts instantiates the service directly rather than using a composition root", "passed": true, "evidence": "Moderate Issue #3: 'Module-Level Singleton Service in Routes' \u0432\u0402\u201d \"NotificationService is instantiated as a module-level singleton with no way to inject dependencies (because the current implementation takes no constructor arguments).\""}], "notes": []}, {"eval_id": 2, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 74.8, "tokens": 5891, "tool_calls": 6, "errors": 0}, "expectations": [{"text": "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface", "passed": true, "evidence": "Finding 5 states: 'There is no interface/port separating AnalyticsService from AnalyticsRepository. The service imports the concrete class directly: import { AnalyticsRepository } from \"./repository\";' and 'application depends on infrastructure rather than infrastructure depending on application.'"}, {"text": "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)", "passed": true, "evidence": "Finding 2 explicitly shows the constructor code 'this.repo = new AnalyticsRepository();' and states: 'AnalyticsService instantiates AnalyticsRepository directly inside its constructor. This is constructor-side coupling: the service controls its own infrastructure dependency, making it impossible to swap implementations, mock the repository in unit tests, or apply dependency injection at the composition root.'"}, {"text": "Identifies that routes.ts imports AnalyticsRepository directly (presentation \u2192 infrastructure violation)", "passed": true, "evidence": "Finding 3 shows 'const repo = new AnalyticsRepository();' in routes.ts and states 'The route factory creates its own service and repository instances.' The Layer Dependency Summary table explicitly flags 'routes.ts \u2192 AnalyticsRepository' as 'Routes \u2192 Infrastructure (skip application) | YES'."}, {"text": "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer", "passed": true, "evidence": "Finding 1 (CRITICAL) explicitly identifies: 'The /analytics/live route imports the Drizzle db singleton and the pageViews schema table directly and executes a raw query... const rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);' and states 'This violates the fundamental onion rule that outer layers may only call inward through defined ports.'"}, {"text": "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer", "passed": true, "evidence": "Finding 2 Fix section recommends: '// domain/ports.ts export interface IAnalyticsRepository { ... }' and Finding 5 Fix section states: 'Define IAnalyticsRepository in domain/ports.ts (or application/ports.ts) and have AnalyticsRepository implement it.' Remediation step 4 also lists: 'Extract IAnalyticsRepository port. Inject into AnalyticsService via constructor.'"}], "notes": []}, {"eval_id": 3, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 6, "failed": 0, "total": 6, "time_seconds": 72.4, "tokens": 6041, "tool_calls": 3, "errors": 0}, "expectations": [{"text": "Identifies the fat controller / missing service layer anti-pattern", "passed": true, "evidence": "The billing module is implemented as a single 'fat controller' \u0432\u0402\u201d all business logic, data access, and external API orchestration lives directly inside Fastify route handlers. [...] ### 1. No Service or Domain Layer (Critical)"}, {"text": "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers", "passed": true, "evidence": "A `BillingService` (or equivalent application-layer class) that owns orchestration logic such as 'create or retrieve Stripe customer, create subscription, persist record.' [...] Any change to subscription creation logic (e.g., adding trial periods, applying coupons) requires touching route-handler code, which should be concerned only with HTTP concerns (parsing, validation, response shaping)."}, {"text": "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer", "passed": true, "evidence": "Every route handler directly imports and calls `stripe.*` and `db.*`. There is no intermediate layer that encapsulates business logic. [...] ### 2. Stripe Client Instantiated as a Module-Level Singleton (High) [...] Makes it impossible to inject a mock Stripe client in tests \u0432\u0402\u201d there is no seam."}, {"text": "Flags direct DB queries (db.select, db.update) in route handlers", "passed": true, "evidence": "Every route handler directly imports and calls `stripe.*` and `db.*`. [...] A repository or data-access layer that wraps the Drizzle queries so they can be swapped or mocked in tests. [...] await db.update(subscriptions).set({ status: 'cancelled', ... }).where(...); const [user] = await db.select().from(users).where(eq(users.id, userId));"}, {"text": "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)", "passed": true, "evidence": "Extract a `BillingRepository` \u0432\u0402\u201d owns all Drizzle queries for `subscriptions` and `invoices`. Returns typed domain objects, not raw DB rows. Create a `BillingService` \u0432\u0402\u201d orchestrates adapter + repository calls. Contains all business logic (create-or-get-customer, cancel-with-status-update, etc.)."}, {"text": "Notes the missing composition root / dependency injection", "passed": true, "evidence": "The Stripe client is instantiated at module load time using `process.env` directly. [...] Makes it impossible to inject a mock Stripe client in tests \u0432\u0402\u201d there is no seam. [...] Instantiate the Stripe client inside a `StripeAdapter` class that accepts the key via constructor injection (from `SecretsProvider`). Register it as a Fastify plugin/decorator so it can be overridden in tests."}], "notes": []}], "run_summary": {"with_skill": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0}, "time_seconds": {"mean": 93.7667, "stddev": 7.8424, "min": 88.7, "max": 102.8}, "tokens": {"mean": 8993.3333, "stddev": 763.4437, "min": 8388, "max": 9851}}, "without_skill": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0}, "time_seconds": {"mean": 71.2667, "stddev": 4.2158, "min": 66.6, "max": 74.8}, "tokens": {"mean": 6343.3333, "stddev": 657.8498, "min": 5891, "max": 7098}}, "delta": {"pass_rate": "+0.00", "time_seconds": "+22.5", "tokens": "+2650"}}, "notes": []}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

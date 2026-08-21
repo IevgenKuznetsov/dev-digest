@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "domain-imports-infra",
+  "prompt": "We just merged a notification module into the server. I want to make sure the code is architecturally clean before we cut a release. Can you review the implementation and flag anything that doesn't follow proper layering?",
+  "assertions": [
+    "Uses the term 'port' or 'repository interface' (not just 'interface') when prescribing the fix — and specifies it belongs in the domain layer",
+    "Identifies that NotificationService has zero domain logic — it is entirely Drizzle persistence code misplaced in the domain folder",
+    "Names what the correct infrastructure file should be (e.g. repository.ts or infrastructure/NotificationRepository.ts) as the destination for the Drizzle code",
+    "Distinguishes the three layers that need to exist: domain (port/interface), application (service/use-cases), infrastructure (Drizzle repo) — not just 'move the DB code'",
+    "Notes that routes.ts instantiates the service with `new` at module scope and explains this bypasses the composition root / DI wiring"
+  ]
+}

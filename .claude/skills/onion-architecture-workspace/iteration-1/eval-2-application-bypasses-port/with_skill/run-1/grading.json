@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that AnalyticsService imports the concrete AnalyticsRepository class instead of an interface",
+      "passed": true,
+      "evidence": "Violation 1: 'import { AnalyticsRepository } from './repository';   // imports the CONCRETE class' — 'The Application layer (service.ts) must depend on an interface (port) defined in the Domain layer, not on a concrete infrastructure class.'"
+    },
+    {
+      "text": "Flags that AnalyticsService self-instantiates AnalyticsRepository via new (bypasses composition root / DI)",
+      "passed": true,
+      "evidence": "Violation 2: 'constructor() { this.repo = new AnalyticsRepository(); }' — 'The composition root (platform/container.ts) is the only place that should construct concrete implementations... When a service constructs its own collaborators, it bypasses the container entirely. This is the service locator anti-pattern.'"
+    },
+    {
+      "text": "Identifies that routes.ts imports AnalyticsRepository directly (presentation → infrastructure violation)",
+      "passed": true,
+      "evidence": "Violation 3: 'import { AnalyticsRepository } from './repository';  // infrastructure import in presentation' — 'The Presentation layer (routes.ts) must depend on the Application layer only. It must not import from infrastructure (repository.ts, db/schema, drizzle-orm) or bypass the service layer.'"
+    },
+    {
+      "text": "Flags the raw db query in routes.ts /analytics/live that bypasses the service layer",
+      "passed": true,
+      "evidence": "Violation 3: '/analytics/live bypasses ALL layers — raw SQL query in a route handler' with code showing 'const rows = await db.select().from(pageViews).orderBy(desc(pageViews.timestamp)).limit(10);' inside the route handler."
+    },
+    {
+      "text": "Recommends extracting an IAnalyticsRepository interface (port) in the domain layer",
+      "passed": true,
+      "evidence": "Violation 5 and Fix for Violation 1: 'Add domain/ports.ts as shown in Violation 1's fix. This is the prerequisite for every other fix.' — provides concrete interface: 'export interface AnalyticsPort { record(view: PageView): Promise<void>; getDashboardStats(fromDate: Date): Promise<DashboardStats>; getRecentViews(limit: number): Promise<PageView[]>; }'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 11,
+    "errors_encountered": 0,
+    "output_chars": 8388,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 102.825,
+    "total_duration_seconds": 102.8
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

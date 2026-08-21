@@ -1,0 +1,55 @@
+{
+  "expectations": [
+    {
+      "text": "Uses the term 'port' or 'repository interface' (not just 'interface') when prescribing the fix — and specifies it belongs in the domain layer",
+      "passed": true,
+      "evidence": "Finding 1 lists 'modules/notification/domain/INotificationRepository.ts — repository port interface' and the remediation plan step 1 says 'Create modules/notification/domain/INotificationRepository.ts'. The term 'repository port interface' appears explicitly and the domain layer location is specified."
+    },
+    {
+      "text": "Identifies that NotificationService has zero domain logic — it is entirely Drizzle persistence code misplaced in the domain folder",
+      "passed": true,
+      "evidence": "Finding 2 states: 'Every method in NotificationService is a direct database operation: select, insert, update, delete. There is no business logic — no invariants enforced, no domain events raised, no rules about when a notification can be deleted or what constitutes a valid notification.' The summary table row 2 reads: '\"Service\" is actually a repository with no domain logic'."
+    },
+    {
+      "text": "Names what the correct infrastructure file should be (e.g. repository.ts or infrastructure/NotificationRepository.ts) as the destination for the Drizzle code",
+      "passed": true,
+      "evidence": "Finding 1 lists 'modules/notification/infrastructure/DrizzleNotificationRepository.ts — concrete adapter' as a file that 'should exist but does not'. Remediation Plan Priority 1 step 2 repeats: 'Create modules/notification/infrastructure/DrizzleNotificationRepository.ts implementing INotificationRepository with all current Drizzle logic.'"
+    },
+    {
+      "text": "Distinguishes the three layers that need to exist: domain (port/interface), application (service/use-cases), infrastructure (Drizzle repo) — not just 'move the DB code'",
+      "passed": false,
+      "evidence": "The review clearly distinguishes the domain layer (INotificationRepository interface) and infrastructure layer (DrizzleNotificationRepository). However, the application layer is only mentioned tangentially: 'or this collapses into an application-layer use case' and the remediation plan rewrites NotificationService to use the repository interface but does not explicitly establish a distinct application layer as a required artifact. The architecture background diagram shows '[Application Services]' but the three layers as a required triad to create are not enumerated. The review treats this as a two-step fix (domain interface + infrastructure repo) rather than a three-layer reorganization."
+    },
+    {
+      "text": "Notes that routes.ts instantiates the service with `new` at module scope and explains this bypasses the composition root / DI wiring",
+      "passed": false,
+      "evidence": "Finding 4 correctly identifies 'const service = new NotificationService()' at module scope and explains it makes 'dependency injection impossible'. The fix references 'Register the concrete implementation at the module registration site in server/src/modules/index.ts'. However, the review never uses the term 'composition root' — it says 'module registration site' instead. The expectation specifically requires explaining that this bypasses the composition root / DI wiring by name."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 2,
+    "total": 5,
+    "pass_rate": 0.6
+  },
+  "execution_metrics": {
+    "total_tool_calls": 4,
+    "errors_encountered": 0,
+    "output_chars": 8741,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 89.8,
+    "total_duration_seconds": 89.8
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [
+      "Expectation 4 is borderline: the review's architecture diagram labels the middle ring 'Application Services' and the rewritten NotificationService implicitly becomes an application service, but the three-layer split is not explicitly enumerated as three required artifacts to create."
+    ],
+    "needs_review": [
+      "Expectation 5: 'module registration site' vs 'composition root' — graded as failed because the specific term is absent, but the concept is partially present."
+    ],
+    "workarounds": []
+  }
+}

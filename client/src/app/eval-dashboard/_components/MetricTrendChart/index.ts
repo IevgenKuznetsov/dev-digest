@@ -1,0 +1,1 @@
+export { MetricTrendChart } from "./MetricTrendChart";

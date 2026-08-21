@@ -1,0 +1,37 @@
+diff --git a/client/src/app/repos/[repoId]/pulls/page.tsx b/client/src/app/repos/[repoId]/pulls/page.tsx
+index abc1234..def5678 100644
+--- a/client/src/app/repos/[repoId]/pulls/page.tsx
++++ b/client/src/app/repos/[repoId]/pulls/page.tsx
+@@ -1,10 +1,28 @@
+ "use client";
+
+-import { useParams } from "next/navigation";
++import { useState, useEffect } from "react";
++import { useParams } from "next/navigation";
+ import { AppShell } from "@/components/app-shell";
+-import { usePulls } from "@/lib/hooks";
+ import { PRRow } from "./_components/PRRow";
+
+ export default function PullsPage() {
+   const params = useParams<{ repoId: string }>();
+-  const { data: pulls, isLoading } = usePulls(params.repoId);
++  const [pulls, setPulls] = useState<{ number: number; title: string }[]>([]);
++  const [isLoading, setIsLoading] = useState(false);
++
++  useEffect(() => {
++    setIsLoading(true);
++    fetch(`/api/repos/${params.repoId}/pulls`)
++      .then((r) => r.json())
++      .then(setPulls)
++      .finally(() => setIsLoading(false));
++  }, [params.repoId]);
++
+   return (
+     <AppShell>
+-      {isLoading ? <div>Loading…</div> : pulls?.map((pr) => <PRRow key={pr.number} pr={pr} repoId={params.repoId} />)}
++      {isLoading
++        ? <div>Loading…</div>
++        : pulls.map((pr) => <PRRow key={pr.number} pr={pr} repoId={params.repoId} />)}
+     </AppShell>
+   );
+ }

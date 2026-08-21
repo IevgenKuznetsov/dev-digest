@@ -18,7 +18,7 @@ metadata:
 | Phase | Name | User Decision? | Agents Spawned |
 |-------|------|---------------|----------------|
 | 1 | Context gathering | Yes (answers) | None |
-| 2 | Spec creation loop | Yes (QA gate every round) | spec-creator |
+| 2 | Spec creation loop | Yes (QA gate every round) | spec-creator (1 background spawn + SendMessage relay) |
 | 3 | Spec approval | Yes (approve / reject) | None |
 | 4 | Planning | Yes (opt-in) | implementation-planner |
 | 5 | Plan cross-review | No | general-purpose (sonnet) |
@@ -55,139 +55,149 @@ Print a brief summary of what you collected and show the status block, then proc
 
 ## Phase 2: Spec Creation Loop
 
+### Architecture
+
+Spec-creator runs as a **single background agent** for the entire QA loop. After each round it outputs its questions and terminates its turn. The orchestrator proposes answers, gets user approval, then uses `SendMessage` to relay only the approved answers — the agent resumes with its own full context, so feature details never need to be resent.
+
+This is 1 agent spawn + N SendMessage calls instead of N+1 separate spawns with growing prompts.
+
 ### Initial Agent Launch
 
-Spawn the `spec-creator` agent (foreground — wait for response):
+Spawn the `spec-creator` agent **in the background** with the name `spec-qa`:
 
 ```
 Agent tool:
   subagent_type: spec-creator
+  run_in_background: true
+  description: "spec-qa"
   prompt: |
-    Create a specification for the following feature.
+    You are running a multi-round spec creation session in relay mode.
 
     Feature name: <feature_name>
     Target package: <target_package>
+    Spec output path: <if cross-package: specs/<feature_name>/<feature_name>.spec.md | else: <target_package>/specs/<feature_name>/<feature_name>.spec.md>
+
+    Note on output path: if your QA rounds confirm this feature spans multiple packages
+    (server + client, or any 2+ packages), use the root path: specs/<feature_name>/<feature_name>.spec.md.
+    For a single package, use: <target_package>/specs/<feature_name>/<feature_name>.spec.md.
 
     Feature description:
     <feature_details>
 
     <if design_artifacts != none>
-    Design artifacts provided by the user:
+    Design artifacts:
     <design_artifacts>
     </if>
 
-    Configuration:
-    - Run exactly <qa_rounds> round(s) of clarifying questions.
-    - In each round, ask all your questions at once (not one at a time).
-    - After the final round, produce the .spec.md file at:
-      <target_package>/specs/<feature_name>/<feature_name>.spec.md
-    - After writing the file, output: SPEC_COMPLETE: <file_path>
+    Session config: <qa_rounds> QA round(s) total.
 
-    Begin round 1 now: ask all clarifying questions for this round.
+    Protocol:
+    - Ask all your Round 1 clarifying questions now (all at once, not one at a time).
+    - End your response with: ROUND_COMPLETE: 1 of <qa_rounds>
+    - Wait — the orchestrator will send you approved answers via a follow-up message.
+    - On receiving answers: ask Round 2 questions (if rounds remain), or write the spec
+      (if all rounds answered). End each questions round with ROUND_COMPLETE: N of <qa_rounds>.
+    - When writing the spec: resolve the output path per the note above, produce the file,
+      then output: SPEC_COMPLETE: <resolved_path>
+
+    Begin Round 1 now.
 ```
+
+Do NOT wait for this agent inline — it runs in the background. You will be notified when it completes its first round.
 
 ### QA Gate (repeat for each round)
 
-When spec-creator returns a set of questions:
+When spec-creator's background notification arrives:
 
-1. **Parse the questions** — list them numbered.
+1. **Extract questions** from the notification output — list them numbered.
 
-2. **Propose answers** — For each question, write your suggested answer with a one-line rationale. Format:
+2. **Display round header:**
+   > `[Spec QA: Round N of <qa_rounds>]`
+
+3. **Propose answers** — For each question, write your suggested answer with a one-line rationale:
    ```
    Q1: <question text>
    Suggested answer: <your answer>
-   Rationale: <why this is the right answer given the context>
+   Rationale: <why this is the right answer>
 
    Q2: ...
    ```
 
-3. **Present to user** — Send your proposed answers in a single message and ask:
-   > "These are my suggested answers to spec-creator's questions. Review each one — edit any you disagree with, or reply 'approved' if all are good."
+4. **Present to user** and ask:
+   > "These are my suggested answers to spec-creator's Round N questions. Review each — edit any you disagree with, or reply 'approved'."
 
-4. **Wait for user approval** — Do NOT send any answers to spec-creator until the user has explicitly approved or edited the answers. If the user edits answers, confirm the final set before proceeding.
+5. **Wait for user approval.** Do NOT relay answers until explicitly approved. If the user edits answers, confirm the final set before proceeding.
 
-5. **Record the round** — Append to `qa_history`:
+6. **Record the round** — Append to `qa_history`:
    ```
-   { round: N, questions_and_answers: "<approved Q&A pairs, one per line: Q: ... / A: ...>" }
+   { round: N, questions_and_answers: "<approved Q&A pairs: Q: ... / A: ...>" }
    ```
 
-6. **Spawn the next spec-creator** — Spawn a fresh `spec-creator` agent with all accumulated context. **Never use SendMessage** — spec-creator cannot be continued via relay; always re-spawn with the full history in the prompt.
+7. **Relay answers via SendMessage** — send to `spec-qa`:
 
    **If more rounds remain (current round < qa_rounds):**
    ```
-   Agent tool:
-     subagent_type: spec-creator
-     prompt: |
-       You are continuing a spec creation session. Rounds 1 through <N> are complete
-       and approved. You are now in Round <N+1> of <qa_rounds>.
+   SendMessage to: spec-qa
+   Message: |
+     Approved answers for Round <N>:
+     <Q&A pairs, one per line: Q: ... / A: ...>
 
-       DO NOT re-ask any question from a previous round. All prior answers are final.
-       Jump directly to asking Round <N+1> questions.
-
-       Feature name: <feature_name>
-       Target package: <target_package>
-
-       Feature description:
-       <feature_details>
-
-       <if design_artifacts != none>
-       Design artifacts:
-       <design_artifacts>
-       </if>
-
-       ## Resolved decisions (Rounds 1–<N>)
-       <for each entry in qa_history:>
-       ### Round <round>
-       <questions_and_answers verbatim>
-
-       Configuration:
-       - You are in Round <N+1> of <qa_rounds>. Ask all Round <N+1> clarifying questions now.
-       - After the final round is answered, produce the spec file at:
-           <target_package>/specs/<feature_name>/<feature_name>.spec.md
-       - After writing the file, output: SPEC_COMPLETE: <file_path>
-
-       Begin Round <N+1> now.
+     Please ask Round <N+1> clarifying questions now.
+     End with: ROUND_COMPLETE: <N+1> of <qa_rounds>
    ```
 
    **If this was the final round (current round = qa_rounds):**
    ```
-   Agent tool:
-     subagent_type: spec-creator
-     prompt: |
-       You are completing a spec creation session. All <qa_rounds> rounds of clarifying
-       questions have been answered. Produce the final spec file now.
+   SendMessage to: spec-qa
+   Message: |
+     Approved answers for Round <N>:
+     <Q&A pairs, one per line: Q: ... / A: ...>
 
-       DO NOT ask any more questions. Proceed directly to writing the spec.
-
-       Feature name: <feature_name>
-       Target package: <target_package>
-
-       Feature description:
-       <feature_details>
-
-       <if design_artifacts != none>
-       Design artifacts:
-       <design_artifacts>
-       </if>
-
-       ## All Resolved Decisions (Rounds 1–<qa_rounds>)
-       <for each entry in qa_history:>
-       ### Round <round>
-       <questions_and_answers verbatim>
-
-       Produce the spec file at:
-         <target_package>/specs/<feature_name>/<feature_name>.spec.md
-       After writing the file, output: SPEC_COMPLETE: <file_path>
+     All <qa_rounds> rounds are complete. Do NOT ask more questions.
+     Write the spec now to:
+       <target_package>/specs/<feature_name>/<feature_name>.spec.md
+     Then output: SPEC_COMPLETE: <path>
    ```
 
-7. **Wait for response** — spec-creator will either return the next round's questions (repeat from step 1) or output `SPEC_COMPLETE: <path>`.
+8. **Wait for the next background notification** — spec-creator will either output the next round's questions (with ROUND_COMPLETE) or write the spec and output SPEC_COMPLETE.
 
-### Round Tracking
+### Fallback: SendMessage Fails
 
-Display remaining rounds before each QA gate:
-> `[Spec QA: Round N of <qa_rounds>]`
+If spec-creator cannot be resumed via SendMessage (e.g., the agent ID is unavailable), fall back to a fresh spawn with full history:
 
-If spec-creator asks a follow-up before all rounds are used, treat it as the next round.
+```
+Agent tool:
+  subagent_type: spec-creator
+  run_in_background: true
+  description: "spec-qa"
+  prompt: |
+    You are resuming a spec creation session. All prior rounds are resolved.
+    You are now in Round <N+1> of <qa_rounds>.
+
+    Feature name: <feature_name>
+    Target package: <target_package>
+    Spec output path: <target_package>/specs/<feature_name>/<feature_name>.spec.md
+
+    Feature description:
+    <feature_details>
+
+    <if design_artifacts != none>
+    Design artifacts:
+    <design_artifacts>
+    </if>
+
+    ## Resolved decisions (Rounds 1–<N>)
+    <for each entry in qa_history:>
+    ### Round <round>
+    <questions_and_answers verbatim>
+
+    <if N+1 <= qa_rounds:>
+    Ask Round <N+1> questions now. End with: ROUND_COMPLETE: <N+1> of <qa_rounds>
+    <else:>
+    All rounds answered. Write the spec now. Output: SPEC_COMPLETE: <path>
+```
+
+Note in the status block if fallback was used.
 
 ### Completion
 
@@ -463,7 +473,8 @@ States: `PENDING`, `IN PROGRESS`, `COMPLETE`, `SKIPPED`, `FAILED`
 | Scenario | Action |
 |----------|--------|
 | spec-creator fails or times out | Report failure, ask user to retry Phase 2 |
-| spec-creator never outputs `SPEC_COMPLETE` after all rounds | Read the last response and attempt to extract the spec file path; if not found, ask spec-creator explicitly |
+| SendMessage to spec-qa is unavailable | Fall back to fresh spawn with full qa_history in prompt (see Fallback section) |
+| spec-creator never outputs `SPEC_COMPLETE` after all rounds | Read the last response and attempt to extract the spec file path; if not found, send spec-creator a final message asking it to write the file |
 | implementation-planner fails | Report failure, ask if user wants to retry Phase 4 |
 | Cross-review agent fails | Report failure, ask if user wants to retry or skip Phase 5 |
 | Spec file not found after SPEC_COMPLETE | Read the path from agent output, verify with Glob; if missing, ask spec-creator to re-output it |
@@ -480,4 +491,4 @@ States: `PENDING`, `IN PROGRESS`, `COMPLETE`, `SKIPPED`, `FAILED`
 - Does not write the spec or plan itself — delegates entirely to spec-creator and implementation-planner
 - Does not auto-approve any user decision point
 - Does not send answers to spec-creator before user confirms them
-- Does not use SendMessage to continue spec-creator — always re-spawns with full accumulated Q&A history
+- Does not re-spawn spec-creator for each QA round — uses SendMessage relay on the single background agent

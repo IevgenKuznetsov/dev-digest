@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that two separate AnalyticsRepository instances are created (one inside AnalyticsService constructor, one directly in routes.ts) as a direct consequence of bypassing DI",
+      "passed": true,
+      "evidence": "At runtime, `analyticsRoutes` creates **two separate `AnalyticsRepository` instances**: one inside `new AnalyticsService()` (which itself calls `new AnalyticsRepository()` in its constructor), and a second one created directly on the next line in the route file."
+    },
+    {
+      "text": "Flags that getDashboardStats in repository.ts contains business logic (bounce rate calculation, top-page ranking, aggregation) that belongs in the application or domain layer — not the infrastructure layer",
+      "passed": true,
+      "evidence": "Computes bounce rate via session page-count logic (domain rule — what is a 'bounce'?) / Sorts and slices top-10 pages (presentation shaping) / This is four responsibilities collapsed into one infrastructure method. The 'bounce' definition (a session with exactly one page view) is a business rule."
+    },
+    {
+      "text": "Recommends constructor injection pattern explicitly: the service should receive the port interface as a constructor parameter, not self-instantiate",
+      "passed": true,
+      "evidence": "The correct pattern: `export class AnalyticsService { constructor(private readonly repo: IAnalyticsRepository) {} }` — The repository is injected via the constructor parameter. The type is the interface (`IAnalyticsRepository`), not the concrete class."
+    },
+    {
+      "text": "Names the port interface that should be introduced (e.g. IAnalyticsRepository or AnalyticsPort or AnalyticsRepositoryPort) and specifies it belongs in the domain layer",
+      "passed": true,
+      "evidence": "**File:** `modules/analytics/domain/ports.ts` — `export interface IAnalyticsRepository { ... }` / Per the onion architecture dependency rule, inner layers define interfaces; outer layers implement them. The domain layer (`domain/`) must define what it needs."
+    },
+    {
+      "text": "Calls out the /analytics/live raw db query as a distinct, additional violation — separate from the route importing the concrete repository class",
+      "passed": true,
+      "evidence": "**Violation 5: /analytics/live Route — Direct Database Access in Presentation Layer** / **This is a distinct violation from /analytics/recent.** / The `/analytics/live` route goes further: it bypasses **both** the service **and** the repository. It imports `db` and `pageViews` from infrastructure packages directly into the route file."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 13,
+    "errors_encountered": 0,
+    "output_chars": 8721,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 94.0,
+    "total_duration_seconds": 94.0
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

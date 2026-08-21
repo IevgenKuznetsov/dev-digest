@@ -1,0 +1,54 @@
+{
+  "skill_name": "onion-architecture",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We just merged a notification module into the server. I want to make sure the code is architecturally clean before we cut a release. Can you review the implementation and flag anything that doesn't follow proper layering?",
+      "expected_output": "The reviewer should identify that NotificationService.ts (in domain/) imports Drizzle and db directly, name the violation using onion-architecture vocabulary (dependency rule, zero external dependencies, port/adapter), recommend introducing a named repository interface in the domain layer, suggest moving Drizzle code to a separate infrastructure/repository file, and note that routes.ts bypasses the composition root.",
+      "files": [
+        "evals/files/eval-1-domain-imports-infra/modules/notification/domain/NotificationService.ts",
+        "evals/files/eval-1-domain-imports-infra/modules/notification/routes.ts"
+      ],
+      "expectations": [
+        "Uses the term 'port' or 'repository interface' (not just 'interface') when prescribing the fix — and specifies it belongs in the domain layer",
+        "Identifies that NotificationService has zero domain logic — it is entirely Drizzle persistence code misplaced in the domain folder",
+        "Names what the correct infrastructure file should be (e.g. repository.ts or infrastructure/NotificationRepository.ts) as the destination for the Drizzle code",
+        "Distinguishes the three layers that need to exist: domain (port/interface), application (service/use-cases), infrastructure (Drizzle repo) — not just 'move the DB code'",
+        "Notes that routes.ts instantiates the service with `new` at module scope and explains this bypasses the composition root / DI wiring"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're doing a pre-merge architecture review of the analytics module. The team built it quickly and I want a second set of eyes before it lands in main. What do you see?",
+      "expected_output": "The reviewer must identify: (1) AnalyticsService imports the concrete AnalyticsRepository class — should depend on a port interface. (2) AnalyticsService self-wires via new AnalyticsRepository() — bypasses composition root. (3) routes.ts imports AnalyticsRepository directly — presentation importing infrastructure. (4) routes.ts has a raw db query in /analytics/live bypassing the service. (5) Recommends a port interface (IAnalyticsRepository or AnalyticsPort) in domain/. The deeper differentiator: the skill-informed review should also catch that two separate AnalyticsRepository instances are created, that getDashboardStats has business logic inside the infrastructure layer, and should prescribe constructor injection.",
+      "files": [
+        "evals/files/eval-2-application-bypasses-port/modules/analytics/domain/types.ts",
+        "evals/files/eval-2-application-bypasses-port/modules/analytics/repository.ts",
+        "evals/files/eval-2-application-bypasses-port/modules/analytics/service.ts",
+        "evals/files/eval-2-application-bypasses-port/modules/analytics/routes.ts"
+      ],
+      "expectations": [
+        "Identifies that two separate AnalyticsRepository instances are created (one inside AnalyticsService constructor, one directly in routes.ts) as a direct consequence of bypassing DI",
+        "Flags that getDashboardStats in repository.ts contains business logic (bounce rate calculation, top-page ranking, aggregation) that belongs in the application or domain layer — not the infrastructure layer",
+        "Recommends constructor injection pattern explicitly: the service should receive the port interface as a constructor parameter, not self-instantiate",
+        "Names the port interface that should be introduced (e.g. IAnalyticsRepository or AnalyticsPort or AnalyticsRepositoryPort) and specifies it belongs in the domain layer",
+        "Calls out the /analytics/live raw db query as a distinct, additional violation — separate from the route importing the concrete repository class"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "The billing module shipped last sprint. Can you do an architecture review on it and let me know if there are structural issues we should address before the codebase grows?",
+      "expected_output": "The reviewer should identify the fat-controller anti-pattern, the absence of a service and repository layer, embedded business logic and Stripe calls in routes, direct DB queries, and missing DI. The deeper differentiators: (1) identifies the Stripe singleton at module scope as bypassing SecretsProvider (a project-specific convention) and lacking an injection seam. (2) Notes the partial-failure risk in /billing/cancel: Stripe cancel executes before the DB update with no compensation if the update fails. (3) Identifies that the webhook handler is one massive handler containing 3 distinct business events that each warrant a separate use case. (4) Recommends a StripeAdapter port/adapter pair, not just 'inject Stripe'.",
+      "files": [
+        "evals/files/eval-3-fat-controller/modules/billing/routes.ts"
+      ],
+      "expectations": [
+        "Identifies the partial-failure / atomicity risk in /billing/cancel: stripe.subscriptions.cancel() is called before the DB update, so a DB failure after the Stripe call leaves state inconsistent with no rollback",
+        "Notes that the Stripe client is instantiated at module scope bypassing a secrets/config abstraction — it lacks an injection seam for testing and violates the adapter pattern",
+        "Identifies that the webhook handler embeds at least 3 distinct business event handlers (subscription updated, subscription deleted, invoice.payment_failed) inline rather than delegating to separate use cases or handlers",
+        "Recommends a StripeAdapter or StripePort (port/adapter pair) as the correct abstraction — not just 'inject the Stripe client'",
+        "Notes that GET /billing/invoices has a write side effect (upsert into DB) making it non-idempotent and violating HTTP GET semantics — and that this decision logic belongs in a use case, not a route"
+      ]
+    }
+  ]
+}

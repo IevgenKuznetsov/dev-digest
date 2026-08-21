@@ -1,0 +1,56 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies the fat controller / missing service layer anti-pattern",
+      "passed": true,
+      "evidence": "The billing module, as shipped, is a textbook example of the Fat Controller anti-pattern. Every route handler in routes.ts performs direct database access, calls the Stripe API directly, implements business logic, and manages state transitions — all without a service layer, a repository, or any domain abstraction."
+    },
+    {
+      "text": "Notes that business logic (computing daysLeft, isActive, customer lookup) is embedded in route handlers",
+      "passed": true,
+      "evidence": "GET /billing/subscription — retrieves the local subscription record, then calls stripe.subscriptions.retrieve(), computes daysLeft, derives isActive, and extracts planName. This is application-layer orchestration and domain computation sitting in the route handler."
+    },
+    {
+      "text": "Flags direct Stripe API calls in route handlers instead of an application/infrastructure layer",
+      "passed": true,
+      "evidence": "GET /billing/portal — the simplest handler but still makes a direct Stripe API call inside the route. Also: Infrastructure clients belong in the infrastructure layer, constructed by the Container (composition root), not hardcoded in the presentation layer."
+    },
+    {
+      "text": "Flags direct DB queries (db.select, db.update) in route handlers",
+      "passed": true,
+      "evidence": "routes.ts imports directly from the database layer: import { eq, and, desc } from 'drizzle-orm'; import { db } from '../../db'; import { subscriptions, invoices, users } from '../../db/schema'; Per the dependency rule, routes.ts must never import from drizzle-orm or ../../db/schema."
+    },
+    {
+      "text": "Recommends extracting a BillingService (application layer) and/or BillingRepository (infrastructure layer)",
+      "passed": true,
+      "evidence": "Priority 1 (Critical): Create BillingService — extract all use-case logic out of route handlers. Priority 2 (Critical): Create BillingRepository — extract all Drizzle queries into one class. Also includes a full code sample for BillingService class and BillingRepository interface."
+    },
+    {
+      "text": "Notes the missing composition root / dependency injection",
+      "passed": true,
+      "evidence": "Infrastructure clients belong in the infrastructure layer, constructed by the Container (composition root), not hardcoded in the presentation layer. The service.ts code sample shows: constructor(private repo: BillingRepository, private stripe: StripeClient, private secrets: SecretsProvider) and the refactored route uses await getContext(app.container, req)."
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 9,
+    "errors_encountered": 0,
+    "output_chars": 8741,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 89.846,
+    "total_duration_seconds": 89.8
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

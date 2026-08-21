@@ -71,7 +71,7 @@ cd reviewer-core && npm test    # engine tests (no keys, no network)
 
 ## Post-commit review gate
 
-After every `git commit`, invoke `/pr-self-review` to analyze the committed diff.
+After every `git commit`, invoke the `pr-self-review` skill (Skill tool, name: `pr-self-review`) to analyze the committed diff.
 This is not optional. If any CRITICAL issue is found, the merge is blocked until resolved.
 
 ## Post-refactoring checklist

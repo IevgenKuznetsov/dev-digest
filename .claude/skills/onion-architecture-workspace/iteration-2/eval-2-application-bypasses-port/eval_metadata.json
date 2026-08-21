@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "application-bypasses-port",
+  "prompt": "We're doing a pre-merge architecture review of the analytics module. The team built it quickly and I want a second set of eyes before it lands in main. What do you see?",
+  "assertions": [
+    "Identifies that two separate AnalyticsRepository instances are created (one inside AnalyticsService constructor, one directly in routes.ts) as a direct consequence of bypassing DI",
+    "Flags that getDashboardStats in repository.ts contains business logic (bounce rate calculation, top-page ranking, aggregation) that belongs in the application or domain layer — not the infrastructure layer",
+    "Recommends constructor injection pattern explicitly: the service should receive the port interface as a constructor parameter, not self-instantiate",
+    "Names the port interface that should be introduced (e.g. IAnalyticsRepository or AnalyticsPort or AnalyticsRepositoryPort) and specifies it belongs in the domain layer",
+    "Calls out the /analytics/live raw db query as a distinct, additional violation — separate from the route importing the concrete repository class"
+  ]
+}

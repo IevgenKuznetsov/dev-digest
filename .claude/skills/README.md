@@ -16,6 +16,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [dependency-checker](dependency-checker/SKILL.md) | Cross-cutting | Dependency health report: sizes, outdated, security, cross-package analysis, optimization suggestions |
 | [engineering-insight](engineering-insight/SKILL.md) | Cross-cutting | Proactively captures non-obvious insights to INSIGHTS.md files |
 | [implement-sdd](implement-sdd/SKILL.md) | Orchestration | 9-step SDD pipeline: spec+plan → implement → test → review → docs (explicit `/implement-sdd` only) |
 

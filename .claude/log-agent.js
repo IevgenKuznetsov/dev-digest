@@ -10,13 +10,16 @@
  *   subagent     — subagent_type from TOOL_INPUT (defaults to 'general-purpose')
  *   description  — description from TOOL_INPUT, or first 80 chars of prompt as fallback
  *   background   — true if run_in_background was set
+ *   isolation    — isolation mode from TOOL_INPUT ('worktree' or null)
  *   model        — model override from TOOL_INPUT, or null (agent uses its default)
  *   tokens       — total_tokens from <usage> block in TOOL_OUTPUT (foreground only)
  *   tool_uses    — tool_uses count from <usage> block (foreground only)
  *   duration_ms  — duration_ms from <usage> block (foreground only)
+ *   outcome      — first 150 chars of the agent's result text (foreground only);
+ *                  captures what the agent actually did/found, not just what it was asked
  *
  * Note: background agents fire PostToolUse at launch time, before completion,
- * so tokens/tool_uses/duration_ms are always null for background agents.
+ * so tokens/tool_uses/duration_ms/outcome are always null for background agents.
  */
 const fs = require('fs');
 const logPath = '.claude/session-log.jsonl';
@@ -49,6 +52,7 @@ try {
   let tokens = null;
   let toolUses = null;
   let durationMs = null;
+  let outcome = null;
 
   try {
     const rawOutput = process.env.TOOL_OUTPUT || '';
@@ -71,6 +75,12 @@ try {
       if (mTools) toolUses = parseInt(mTools[1], 10);
       if (mDuration) durationMs = parseInt(mDuration[1], 10);
     }
+
+    // Extract outcome: the agent's result text (strip usage block, take first 150 chars)
+    if (!input.run_in_background && outputText) {
+      const stripped = outputText.replace(/<usage>[\s\S]*?<\/usage>/g, '').trim();
+      if (stripped) outcome = stripped.replace(/\s+/g, ' ').slice(0, 150);
+    }
   } catch (_) { /* never let output parsing crash the hook */ }
 
   const entry = {
@@ -78,10 +88,12 @@ try {
     subagent: input.subagent_type || 'general-purpose',
     description: description.slice(0, 120),
     background: !!input.run_in_background,
+    isolation: input.isolation || null,
     model: input.model || null,
     tokens,
     tool_uses: toolUses,
     duration_ms: durationMs,
+    outcome,
   };
 
   fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');

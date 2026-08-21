@@ -5,8 +5,10 @@ import { Icon, Badge, Button, SectionLabel, EmptyState } from "@devdigest/ui";
 import { RunStatus } from "../RunStatus";
 import { RunHistory } from "../RunHistory/RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
+import { EvalCaseEditorModal } from "@/components/eval-case-editor";
+import { notify } from "@/lib/toast";
 import { s } from "./styles";
-import type { FindingRecord, ReviewRecord, RunSummary, PrCommit } from "@devdigest/shared";
+import type { FindingRecord, ReviewRecord, RunSummary, PrCommit, CreateEvalCaseInput } from "@devdigest/shared";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 interface FindingsTabProps {
@@ -21,6 +23,8 @@ interface FindingsTabProps {
   /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Pre-built path → patch map so FindingCards can populate eval-case diffs. */
+  fileDiffMap?: Map<string, string>;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
@@ -39,6 +43,7 @@ export function FindingsTab({
   cancelMutation,
   repoFullName,
   headSha,
+  fileDiffMap,
   onOpenTrace,
   onDelete,
   onRunDone,
@@ -86,6 +91,23 @@ export function FindingsTab({
       }
     }
   }, [highlightFinding, runs]);
+
+  // Eval case editor modal state — opened from FindingCard "Turn into eval case"
+  const [evalModal, setEvalModal] = React.useState<{
+    agentId: string;
+    initialData: Partial<CreateEvalCaseInput>;
+  } | null>(null);
+
+  const handleCreateEvalCase = useCallback(
+    (agentId: string | null, data: Partial<CreateEvalCaseInput>) => {
+      if (!agentId) {
+        notify.error("Cannot create eval case — agent is unknown for this review");
+        return;
+      }
+      setEvalModal({ agentId, initialData: data });
+    },
+    [],
+  );
 
   return (
     <section>
@@ -179,11 +201,22 @@ export function FindingsTab({
             defaultOpen={i === 0}
             repoFullName={repoFullName}
             headSha={headSha}
+            fileDiffMap={fileDiffMap}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
             targetFindingId={target?.findingId ?? null}
+            onCreateEvalCase={(data) => handleCreateEvalCase(review.agent_id, data)}
           />
         ))
+      )}
+
+      {evalModal && (
+        <EvalCaseEditorModal
+          agentId={evalModal.agentId}
+          initialData={evalModal.initialData}
+          onClose={() => setEvalModal(null)}
+          onSaved={() => setEvalModal(null)}
+        />
       )}
     </section>
   );

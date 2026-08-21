@@ -1,0 +1,51 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies the partial-failure / atomicity risk in /billing/cancel: stripe.subscriptions.cancel() is called before the DB update, so a DB failure after the Stripe call leaves state inconsistent with no rollback",
+      "passed": true,
+      "evidence": "Issue 1 — /billing/cancel: No Compensation for Partial Failure [CRITICAL]: 'Stripe's API is called first and succeeds. The subscription is now cancelled in Stripe's system. If the subsequent DB update throws... the handler propagates an unhandled exception... The local DB record is now permanently out of sync with Stripe's truth. There is no compensation mechanism.'"
+    },
+    {
+      "text": "Notes that the Stripe client is instantiated at module scope bypassing a secrets/config abstraction — it lacks an injection seam for testing and violates the adapter pattern",
+      "passed": true,
+      "evidence": "Issue 2 — Stripe Client at Module Scope: Injection Seam Problem [HIGH]: 'const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, ...) — module-level singleton... Untestable in isolation. Every test that imports this route file will attempt to instantiate a real Stripe client. There is no seam to swap in a mock... Hidden coupling to process.env. The rest of the codebase routes all secrets through SecretsProvider... This module breaks that convention.'"
+    },
+    {
+      "text": "Identifies that the webhook handler embeds at least 3 distinct business event handlers (subscription updated, subscription deleted, invoice.payment_failed) inline rather than delegating to separate use cases or handlers",
+      "passed": true,
+      "evidence": "Issue 3 — Webhook Handler: Three Business Events, Wrong Structure [HIGH]: 'The webhook handler (lines 137-183) handles three distinct event types in a single route handler: customer.subscription.updated, customer.subscription.deleted, invoice.payment_failed. Three separate use cases are merged... No event routing abstraction.'"
+    },
+    {
+      "text": "Recommends a StripeAdapter or StripePort (port/adapter pair) as the correct abstraction — not just 'inject the Stripe client'",
+      "passed": true,
+      "evidence": "Issue 4 — Correct Port/Adapter Abstraction for Stripe [MEDIUM]: ''Just inject the Stripe client' is an incomplete fix... The correct abstraction is a domain-defined port (PaymentProvider interface)... The StripePaymentProvider adapter (infrastructure layer) translates between the domain vocabulary and Stripe's API.' Issue 2 also defines PaymentProvider interface with StripePaymentProvider adapter."
+    },
+    {
+      "text": "Notes that GET /billing/invoices has a write side effect (upsert into DB) making it non-idempotent and violating HTTP GET semantics — and that this decision logic belongs in a use case, not a route",
+      "passed": true,
+      "evidence": "Issue 5 — /billing/invoices GET: HTTP Contract Violation [HIGH]: 'HTTP contract violation: GET must be safe and idempotent. RFC 9110 Section 9.2 defines safe methods as those that do not have any side effects on the server. A GET request that performs a database write violates this contract.' Fix recommends separating concerns: 'Invoices should be synced to the DB by the webhook handler... or by an explicit background sync job.'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "total_tool_calls": 11,
+    "errors_encountered": 0,
+    "output_chars": 14439,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "executor_duration_seconds": 121.2,
+    "total_duration_seconds": 121.2
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}
