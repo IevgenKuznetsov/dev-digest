@@ -11,8 +11,23 @@ const EVAL_ITEM = {
   gKey: "e",
 };
 
+// gKey "r" chosen for CI Runs — avoids collision with "c" (conventions),
+// "e" (eval), "s" (skills), "a" (agents), "p" (pulls), "o" (onboarding), "x" (context).
+// Plan suggested "c" but that collides with conventions in the same section.
+// "Workflow" icon used — "Rocket" is not in the Icon registry.
+const CI_RUNS_ITEM = {
+  key: "ci-runs",
+  label: "CI Runs",
+  icon: "Workflow" as const,
+  href: "/ci-runs",
+  gKey: "r",
+};
+
 // Append to SKILLS LAB section (index 1) if not already present.
 const skillsLab = NAV.find((g) => g.section === "SKILLS LAB");
 if (skillsLab && !skillsLab.items.some((it) => it.key === "eval")) {
   skillsLab.items.push(EVAL_ITEM);
+}
+if (skillsLab && !skillsLab.items.some((it) => it.key === "ci-runs")) {
+  skillsLab.items.push(CI_RUNS_ITEM);
 }
