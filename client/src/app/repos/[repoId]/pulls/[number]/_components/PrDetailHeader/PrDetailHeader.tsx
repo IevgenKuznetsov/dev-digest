@@ -3,6 +3,7 @@
 import React from "react";
 import { Icon, Avatar, Badge, Button, Tabs } from "@devdigest/ui";
 import { RunReviewDropdown } from "../RunReviewDropdown";
+import { RunAgentsButton } from "../RunAgentsButton";
 import { s } from "./styles";
 import type { PrDetail } from "@/lib/types";
 
@@ -89,6 +90,7 @@ export function PrDetailHeader({
               onRunsStarted={onRunsStarted}
             />
           )}
+          {prId && <RunAgentsButton prId={prId} />}
         </div>
       </div>
       {(pr.status === "merged" || pr.status === "closed") && (

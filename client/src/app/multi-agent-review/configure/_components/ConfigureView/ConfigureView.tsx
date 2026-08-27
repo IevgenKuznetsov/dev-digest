@@ -12,7 +12,7 @@ import {
   useCreateMultiAgentRun,
 } from "../../../../../lib/hooks/multi-agent-review";
 import { useActiveRepo } from "../../../../../lib/repo-context";
-import { AgentCheckboxList } from "../AgentCheckboxList";
+import { AgentCheckboxList } from "../../../../../components/agent-checkbox-list";
 import { EstimatePanel } from "../EstimatePanel";
 import type { AgentEstimate } from "@devdigest/shared";
 
@@ -185,11 +185,11 @@ export function ConfigureView() {
                 onChange={(e) => setSelectedPrId(e.target.value)}
                 aria-label="Select pull request"
               >
-                <option value="">— Select a pull request —</option>
+                <option value="" style={{ color: "#000" }}>— Select a pull request —</option>
                 {(pulls ?? [])
                   .filter((pr) => pr.id != null)
                   .map((pr) => (
-                    <option key={pr.id!} value={pr.id!}>
+                    <option key={pr.id!} value={pr.id!} style={{ color: "#000" }}>
                       #{pr.number} — {pr.title}
                     </option>
                   ))}
