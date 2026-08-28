@@ -33,5 +33,5 @@ export function isBriefResponse(data: RiskBriefData): data is RiskBriefResponse 
 export function parseFileLine(ref: string): { file: string; line?: number } {
   const match = /^(.+?):(\d+)$/.exec(ref);
   if (!match) return { file: ref };
-  return { file: match[1], line: parseInt(match[2], 10) };
+  return { file: match[1]!, line: parseInt(match[2]!, 10) };
 }

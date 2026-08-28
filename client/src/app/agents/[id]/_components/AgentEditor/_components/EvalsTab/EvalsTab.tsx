@@ -55,7 +55,7 @@ export function EvalsTab({ agent }: { agent: Agent }) {
 
   // Fetch the latest completed batch to get per-case pass/fail
   // batches are sorted ascending by ranAt, so findLast gets the most recent.
-  const latestDoneBatch = batches?.findLast((b) => b.status === "done") ?? null;
+  const latestDoneBatch = batches ? ([...batches].reverse().find((b) => b.status === "done") ?? null) : null;
   const { data: latestBatchDetail } = useEvalBatch(latestDoneBatch?.id ?? null);
 
   // Fetch active batch detail for progress tracking (polls while running)

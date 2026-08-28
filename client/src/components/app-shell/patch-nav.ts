@@ -11,8 +11,19 @@ const EVAL_ITEM = {
   gKey: "e",
 };
 
+const MULTI_AGENT_ITEM = {
+  key: "multi-agent-review",
+  label: "Multi-Agent Review",
+  icon: "Users" as const,
+  href: "/multi-agent-review/configure",
+  gKey: "m",
+};
+
 // Append to SKILLS LAB section (index 1) if not already present.
 const skillsLab = NAV.find((g) => g.section === "SKILLS LAB");
 if (skillsLab && !skillsLab.items.some((it) => it.key === "eval")) {
   skillsLab.items.push(EVAL_ITEM);
+}
+if (skillsLab && !skillsLab.items.some((it) => it.key === "multi-agent-review")) {
+  skillsLab.items.push(MULTI_AGENT_ITEM);
 }

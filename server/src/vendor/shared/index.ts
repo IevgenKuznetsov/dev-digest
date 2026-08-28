@@ -33,3 +33,4 @@ export * from './contracts/blast-api.js';
 export * from './contracts/onboarding.js';
 export * from './contracts/brief-response.js';
 export * from './contracts/eval-pipeline.js';
+export * from './contracts/multi-agent-api.js';

@@ -152,6 +152,10 @@ export class ReviewRepository {
     prId: string;
     provider: string | null;
     model: string | null;
+    /** Agent display name — stored at creation time so it survives agent deletion. */
+    agentName?: string;
+    /** FK to multi_agent_runs.id — set when this run is part of a coordinated run. */
+    multiAgentRunId?: string;
   }): Promise<string> {
     return runRepo.createAgentRun(this.db, values);
   }

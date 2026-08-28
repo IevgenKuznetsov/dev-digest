@@ -388,7 +388,7 @@ function EvalsTab({ skill }: { skill: Skill }) {
                 borderRadius: 8,
               }}
             >
-              <Icon.Circle size={10} style={{ color: "var(--text-muted)" }} />
+              <Icon.Dot size={10} style={{ color: "var(--text-muted)" }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{ec.name}</div>
                 {ec.notes && (
