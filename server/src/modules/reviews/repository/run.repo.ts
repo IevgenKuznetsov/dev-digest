@@ -122,10 +122,6 @@ export async function createAgentRun(
     prId: string;
     provider: string | null;
     model: string | null;
-    /** Agent display name — stored at creation time so it survives agent deletion. */
-    agentName?: string;
-    /** FK to multi_agent_runs.id — set when this run is part of a coordinated run. */
-    multiAgentRunId?: string;
   },
 ): Promise<string> {
   const [row] = await db
@@ -138,8 +134,6 @@ export async function createAgentRun(
       model: values.model,
       status: 'running',
       source: 'local',
-      agentName: values.agentName ?? '',
-      multiAgentRunId: values.multiAgentRunId ?? null,
     })
     .returning({ id: t.agentRuns.id });
   return row!.id;
