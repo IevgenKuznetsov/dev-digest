@@ -1,0 +1,1 @@
+ALTER TABLE "agent_runs" ALTER COLUMN "agent_name" DROP DEFAULT;

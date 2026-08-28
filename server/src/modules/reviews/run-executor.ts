@@ -60,6 +60,7 @@ export class ReviewRunExecutor {
     repo: typeof schema.repos.$inferSelect,
     jobs: { agent: AgentRow; runId: string }[],
     logger?: Logger,
+    opts: { parallel?: boolean } = {},
   ): Promise<void> {
     // ONE logger fanned out over every queued run: shared pre-work (diff +
     // intent) is streamed into each target agent's Live Log and persisted into
@@ -117,7 +118,9 @@ export class ReviewRunExecutor {
       return undefined;
     });
 
-    for (const { agent, runId } of jobs) {
+    // Execute one agent's review, isolating its failure so it never affects the
+    // other queued agents. Never rejects — errors are persisted + logged here.
+    const runJob = async ({ agent, runId }: { agent: AgentRow; runId: string }): Promise<void> => {
       const agentStart = Date.now();
       logger?.info(
         { runId, agent: agent.name, provider: agent.provider, model: agent.model, prId: pull.id },
@@ -144,6 +147,14 @@ export class ReviewRunExecutor {
           `review: agent "${agent.name}" ${cancelled ? 'cancelled' : 'failed'}`,
         );
       }
+    };
+
+    // Multi-agent runs execute agents concurrently (bounded by the slowest agent);
+    // the single-agent / "Run all" flow stays sequential to preserve its behavior.
+    if (opts.parallel) {
+      await Promise.all(jobs.map((job) => runJob(job)));
+    } else {
+      for (const job of jobs) await runJob(job);
     }
 
     // Best-effort: populate pseudocode_summary on pr_files after all agents
