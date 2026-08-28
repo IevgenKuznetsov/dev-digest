@@ -59,7 +59,7 @@ export function OnboardingView({ repoId }: OnboardingViewProps) {
 
   const phaseLabel = GENERATION_PHASES.reduce(
     (label, phase) => (elapsedMs >= phase.afterMs ? phase.label : label),
-    GENERATION_PHASES[0].label,
+    GENERATION_PHASES[0]?.label ?? "",
   );
 
   const tour = data != null && !("status" in data) ? (data as OnboardingResponse) : null;
