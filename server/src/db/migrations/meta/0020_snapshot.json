@@ -1,6 +1,6 @@
 {
-  "id": "e154f52a-c901-407c-83ab-b0f315928b51",
-  "prevId": "4e6968e3-7438-4422-8a71-2d5032979fc7",
+  "id": "19184f6e-9d30-4486-96d2-30d3f19218e1",
+  "prevId": "a0572280-5727-420e-9da5-74b8748e9040",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2368,8 +2368,7 @@
           "name": "owner_kind",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'agent'"
+          "notNull": true
         },
         "agent_version": {
           "name": "agent_version",
@@ -2433,23 +2432,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "eval_batches_owner_id_idx": {
-          "name": "eval_batches_owner_id_idx",
-          "columns": [
-            {
-              "expression": "owner_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "eval_batches_owner_id_agents_id_fk": {
           "name": "eval_batches_owner_id_agents_id_fk",
@@ -2595,12 +2578,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "batch_id": {
-          "name": "batch_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "ran_at": {
           "name": "ran_at",
           "type": "timestamp with time zone",
@@ -2650,6 +2627,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "error": {
           "name": "error",
           "type": "text",
@@ -2657,23 +2640,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "eval_runs_batch_id_idx": {
-          "name": "eval_runs_batch_id_idx",
-          "columns": [
-            {
-              "expression": "batch_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "eval_runs_case_id_eval_cases_id_fk": {
           "name": "eval_runs_case_id_eval_cases_id_fk",
@@ -2743,6 +2710,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "agent_version": {
+          "name": "agent_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -2822,6 +2795,24 @@
         },
         "source": {
           "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commit_sha": {
+          "name": "commit_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manifest_version": {
+          "name": "manifest_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2963,6 +2954,18 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "multi_agent_run_id": {
+          "name": "multi_agent_run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_name": {
+          "name": "agent_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
@@ -2999,6 +3002,19 @@
           "tableTo": "pull_requests",
           "columnsFrom": [
             "pr_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "agent_runs_multi_agent_run_id_multi_agent_runs_id_fk": {
+          "name": "agent_runs_multi_agent_run_id_multi_agent_runs_id_fk",
+          "tableFrom": "agent_runs",
+          "tableTo": "multi_agent_runs",
+          "columnsFrom": [
+            "multi_agent_run_id"
           ],
           "columnsTo": [
             "id"
