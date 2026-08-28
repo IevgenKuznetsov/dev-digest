@@ -29,6 +29,21 @@ export const agentRuns = pgTable('agent_runs', {
   score: integer('score'),
   /** Findings that tripped the agent's gate (severity ≥ ciFailOn). */
   blockers: integer('blockers'),
+  /**
+   * FK to multi_agent_runs.id — set when this run was created as part of a
+   * coordinated multi-agent review. NULL for single-agent and "run all" flows.
+   * ON DELETE SET NULL so historical run data is preserved if the parent row
+   * is ever removed.
+   */
+  multiAgentRunId: uuid('multi_agent_run_id').references(() => multiAgentRuns.id, {
+    onDelete: 'set null',
+  }),
+  /**
+   * Agent display name captured at run-creation time. Preserved after agent
+   * deletion (spec edge case 5). Empty string for runs created before this
+   * column was added (backfill default).
+   */
+  agentName: text('agent_name').notNull(),
 });
 
 /** Whole trace of one run as a SINGLE jsonb document. */

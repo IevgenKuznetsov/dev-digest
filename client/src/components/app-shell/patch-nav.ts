@@ -11,6 +11,7 @@ const EVAL_ITEM = {
   gKey: "e",
 };
 
+
 // gKey "r" chosen for CI Runs — avoids collision with "c" (conventions),
 // "e" (eval), "s" (skills), "a" (agents), "p" (pulls), "o" (onboarding), "x" (context).
 // Plan suggested "c" but that collides with conventions in the same section.
@@ -23,6 +24,14 @@ const CI_RUNS_ITEM = {
   gKey: "r",
 };
 
+const MULTI_AGENT_ITEM = {
+  key: "multi-agent-review",
+  label: "Multi-Agent Review",
+  icon: "Users" as const,
+  href: "/multi-agent-review/configure",
+  gKey: "m",
+};
+
 // Append to SKILLS LAB section (index 1) if not already present.
 const skillsLab = NAV.find((g) => g.section === "SKILLS LAB");
 if (skillsLab && !skillsLab.items.some((it) => it.key === "eval")) {
@@ -30,4 +39,7 @@ if (skillsLab && !skillsLab.items.some((it) => it.key === "eval")) {
 }
 if (skillsLab && !skillsLab.items.some((it) => it.key === "ci-runs")) {
   skillsLab.items.push(CI_RUNS_ITEM);
+}
+if (skillsLab && !skillsLab.items.some((it) => it.key === "multi-agent-review")) {
+  skillsLab.items.push(MULTI_AGENT_ITEM);
 }
