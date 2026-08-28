@@ -86,9 +86,26 @@ export function ResultsView({ multiAgentRunId }: ResultsViewProps) {
   // We detect connection loss by observing the `running` flag going false while DB still says running.
   const { running: sseRunning } = useRunEvents(runningRunIds);
 
+  // Whether SSE has actually connected for the current set of running runs. On
+  // mount `sseRunning` is false until useRunEvents opens the EventSources, so we
+  // must NOT treat that initial false as a dropped connection (that flagged every
+  // column as "Connection lost" immediately). Only a true→false transition counts.
+  const sseHasConnected = React.useRef(false);
+
   React.useEffect(() => {
-    // When SSE stops (connection drops) but DB still shows running — mark as lost
-    if (!sseRunning && runningRunIds.length > 0) {
+    if (runningRunIds.length === 0) {
+      sseHasConnected.current = false;
+      return;
+    }
+    if (sseRunning) {
+      // Connected (or reconnected) — remember it and clear any stale lost flags.
+      sseHasConnected.current = true;
+      setConnectionLost((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      return;
+    }
+    // SSE reports not-running while DB still shows running — only a genuine drop
+    // (we were connected before) counts as a lost connection.
+    if (sseHasConnected.current) {
       const lostMap: Record<string, boolean> = {};
       for (const id of runningRunIds) {
         lostMap[id] = true;

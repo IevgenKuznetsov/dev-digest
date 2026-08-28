@@ -1,6 +1,6 @@
 # Insights
 
-> Draft — entries are under human review. Last updated: 2026-08-25.
+> Draft — entries are under human review. Last updated: 2026-08-27.
 
 
 
@@ -37,3 +37,4 @@
 - `2026-08-25` **Recurring Errors & Fixes:** `NotFoundError` always serializes with `error.code === 'not_found'` regardless of the `details` argument. Sub-codes like `agent_not_found` or `pull_not_found` appear only in `error.details.code`, NOT in the top-level `error.code`. Integration tests asserting `body.error.code === 'agent_not_found'` will fail — assert `body.error.code === 'not_found'` and `body.error.details` separately — `server/src/platform/errors.ts:19-23`
 
 - `2026-08-25` **Recurring Errors & Fixes:** When two implementor agents both run `pnpm db:generate` sequentially at the same schema state, the second agent's `db:generate` overwrites the committed snapshot file (e.g. `0017_snapshot.json`) with the prior snapshot's `id`/`prevId`, causing all subsequent `pnpm db:generate` calls to fail with "are pointing to a parent snapshot which is a collision". Fix: restore the corrupted snapshot from git (`git show HEAD:server/src/db/migrations/meta/0017_snapshot.json | node -e "...writeFileSync..."`) then re-run `pnpm db:generate` — `server/src/db/migrations/meta/0017_snapshot.json`, `server/src/db/migrations/meta/_journal.json`
+- `2026-08-27` **What Doesn't Work:** `ReviewRunExecutor.executeRuns` (shared by the single-agent "Run All" flow and the multi-agent flow) ran its jobs strictly sequentially via `for (const job of jobs) await runJob(job)` — so a multi-agent run only advanced one agent at a time even though every `agent_run` row is created with `status:'running'` up front, giving the false impression that all agents stalled/were stopped. Fix: add an `opts: { parallel?: boolean }` param; multi-agent's `service.ts` passes `{ parallel: true }` to fan out with `Promise.all(jobs.map(runJob))`. `runJob` must be self-catching (never reject) so one agent's failure doesn't abort the others — `server/src/modules/reviews/run-executor.ts`, `server/src/modules/multi-agent-review/service.ts:87`

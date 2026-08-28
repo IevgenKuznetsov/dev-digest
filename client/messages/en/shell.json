@@ -24,6 +24,7 @@
     "eval": "Eval Dashboard",
     "memory": "Memory",
     "multi-agent": "Multi-Agent Review",
+    "multi-agent-review": "Multi-Agent Review",
     "agent-performance": "Agent Performance",
     "ci-runs": "CI Runs"
   },

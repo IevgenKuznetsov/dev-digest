@@ -83,7 +83,8 @@ export class MultiAgentReviewService {
     }
 
     // Fire-and-forget: HTTP response returns with runIds immediately.
-    void this.executor.executeRuns(workspaceId, pull, repoRow, jobs, logger).catch((err) => {
+    // parallel:true — multi-agent runs execute all agents concurrently.
+    void this.executor.executeRuns(workspaceId, pull, repoRow, jobs, logger, { parallel: true }).catch((err) => {
       logger?.error(
         { prId, multiAgentRunId, err: (err as Error).message },
         'multi-agent-review: background execution crashed',
