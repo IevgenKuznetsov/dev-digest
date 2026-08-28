@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Icon, Avatar, Badge, Button, Tabs } from "@devdigest/ui";
-import { RunAgentsButton } from "../RunAgentsButton";
+import { RunReviewDropdown } from "../RunReviewDropdown";
 import { s } from "./styles";
 import type { PrDetail } from "@/lib/types";
 
@@ -14,6 +14,8 @@ interface PrDetailHeaderProps {
   /** github.com PR URL; null when the repo's full_name isn't known yet. */
   githubUrl?: string | null;
   onSetTab: (tab: string) => void;
+  onRunStart: () => void;
+  onRunsStarted: () => void;
 }
 
 export function PrDetailHeader({
@@ -23,6 +25,8 @@ export function PrDetailHeader({
   findingsCount,
   githubUrl,
   onSetTab,
+  onRunStart,
+  onRunsStarted,
 }: PrDetailHeaderProps) {
   const statusColor =
     pr.status === "merged"
@@ -77,7 +81,14 @@ export function PrDetailHeader({
           >
             View on GitHub
           </Button>
-          {prId && <RunAgentsButton prId={prId} />}
+          {prId && (
+            <RunReviewDropdown
+              prId={prId}
+              warnMerged={pr.status === "merged" || pr.status === "closed"}
+              onRunStart={onRunStart}
+              onRunsStarted={onRunsStarted}
+            />
+          )}
         </div>
       </div>
       {(pr.status === "merged" || pr.status === "closed") && (
