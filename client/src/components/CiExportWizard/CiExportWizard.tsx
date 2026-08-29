@@ -7,9 +7,18 @@ import React from "react";
 import { Modal } from "@devdigest/ui";
 import { ExportWizardSteps } from "@devdigest/ui";
 import { useExportCi } from "../../lib/hooks/ci";
-import { WIZARD_LABELS, TARGET_CARDS, AVAILABLE_TRIGGERS, PUBLISH_MODES } from "./constants";
-import { buildZip, triggerDownload, extractWorkflowYaml } from "./helpers";
-import type { CiFile, CiExport } from "@devdigest/shared";
+import type { CiExportResult } from "../../lib/hooks/ci";
+import { ApiError } from "../../lib/api";
+import {
+  WIZARD_LABELS,
+  TARGET_CARDS,
+  AVAILABLE_TRIGGERS,
+  PUBLISH_MODES,
+  DEFAULT_RUNNER_LABEL_INPUT,
+  DEFAULT_STUDIO_URL_INPUT,
+} from "./constants";
+import { buildZip, triggerDownload, extractWorkflowYaml, parseRunnerLabel } from "./helpers";
+import type { CiFile, CiExportInputBody } from "@devdigest/shared";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -224,6 +233,10 @@ function StepConfigure({
   onTriggersChange,
   postAs,
   onPostAsChange,
+  runnerLabel,
+  onRunnerLabelChange,
+  studioUrl,
+  onStudioUrlChange,
 }: {
   repo: string;
   onRepoChange: (v: string) => void;
@@ -231,6 +244,10 @@ function StepConfigure({
   onTriggersChange: (v: string[]) => void;
   postAs: string;
   onPostAsChange: (v: string) => void;
+  runnerLabel: string;
+  onRunnerLabelChange: (v: string) => void;
+  studioUrl: string;
+  onStudioUrlChange: (v: string) => void;
 }) {
   function toggleTrigger(key: string) {
     onTriggersChange(
@@ -305,6 +322,62 @@ function StepConfigure({
           ))}
         </div>
       </div>
+
+      {/* Self-hosted runner label (AC-U9, AC-E4b) */}
+      <div>
+        <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>
+          Self-hosted Runner Label{" "}
+          <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(comma-separated)</span>
+        </label>
+        <input
+          type="text"
+          aria-label="Self-hosted Runner Label"
+          value={runnerLabel}
+          onChange={(e) => onRunnerLabelChange(e.target.value)}
+          placeholder={DEFAULT_RUNNER_LABEL_INPUT}
+          style={{
+            width: "100%",
+            padding: "8px 12px",
+            borderRadius: 7,
+            border: "1px solid var(--border-strong)",
+            background: "var(--bg-surface)",
+            color: "var(--text-primary)",
+            fontSize: 13,
+            boxSizing: "border-box",
+          }}
+        />
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+          Sets the workflow&apos;s <code>runs-on:</code> label set.
+        </div>
+      </div>
+
+      {/* Studio URL (AC-U7, AC-E4b, AC-E6) */}
+      <div>
+        <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>
+          Studio URL
+        </label>
+        <input
+          type="text"
+          aria-label="Studio URL"
+          value={studioUrl}
+          onChange={(e) => onStudioUrlChange(e.target.value)}
+          placeholder={DEFAULT_STUDIO_URL_INPUT}
+          style={{
+            width: "100%",
+            padding: "8px 12px",
+            borderRadius: 7,
+            border: "1px solid var(--border-strong)",
+            background: "var(--bg-surface)",
+            color: "var(--text-primary)",
+            fontSize: 13,
+            boxSizing: "border-box",
+          }}
+        />
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+          Provisioned into the target repo as the <code>DEVDIGEST_STUDIO_URL</code> Actions
+          variable, reachable from the self-hosted runner over your private network.
+        </div>
+      </div>
     </div>
   );
 }
@@ -317,6 +390,7 @@ function StepInstall({
   repo,
   isPending,
   error,
+  errorCode,
   result,
   onInstallPr,
   onInstallZip,
@@ -324,18 +398,39 @@ function StepInstall({
   repo: string;
   isPending: boolean;
   error: string | null;
-  result: CiExport | null;
+  errorCode: string | null;
+  result: CiExportResult | null;
   onInstallPr: () => void;
   onInstallZip: () => void;
 }) {
+  const isPreflightTokenError = errorCode === "ci_ingest_token_missing";
+
   return (
     <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>
         Choose how to install the agent workflow into <strong>{repo || "(no repo set)"}</strong>.
       </div>
 
-      {/* Error surface (AC-UN3) */}
-      {error && (
+      {/* Pre-flight ingest token error (AC-O2) — distinct from a generic export failure */}
+      {error && isPreflightTokenError && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--error, #ef4444) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--error, #ef4444) 30%, transparent)",
+            fontSize: 13,
+            color: "var(--text-primary)",
+          }}
+        >
+          <strong>Studio CI_INGEST_TOKEN not configured:</strong> {error} Set{" "}
+          <code>CI_INGEST_TOKEN</code> in the studio&apos;s secrets before opening a PR — no
+          placeholder secret will be provisioned into the target repo.
+        </div>
+      )}
+
+      {/* Generic error surface (AC-UN3) */}
+      {error && !isPreflightTokenError && (
         <div
           style={{
             padding: "12px 16px",
@@ -368,6 +463,37 @@ function StepInstall({
         </div>
       )}
 
+      {/* Provisioning outcome — structured server result (AC-E6, AC-UN2) */}
+      {result?.pr_url && result.ingest_wiring.status === "ok" && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--ok, #22c55e) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--ok, #22c55e) 30%, transparent)",
+            fontSize: 13,
+          }}
+        >
+          Ingest wiring configured — <code>CI_INGEST_TOKEN</code> and{" "}
+          <code>DEVDIGEST_STUDIO_URL</code> were provisioned into the target repo.
+        </div>
+      )}
+      {result?.pr_url && result.ingest_wiring.status === "incomplete" && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--warn, #f59e0b) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--warn, #f59e0b) 30%, transparent)",
+            fontSize: 13,
+          }}
+        >
+          <strong>PR opened, but ingest wiring is incomplete.</strong>
+          {result.ingest_wiring.error ? ` ${result.ingest_wiring.error}` : ""} Live CI runs
+          won&apos;t reach the studio until wiring is fixed.
+        </div>
+      )}
+
       {/* Zip success */}
       {result && !result.pr_url && !error && (
         <div
@@ -382,6 +508,37 @@ function StepInstall({
           Files downloaded successfully.
         </div>
       )}
+
+      {/* Private-repo advisory (Edge 16) */}
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          padding: "10px 12px",
+          borderRadius: 7,
+          border: "1px dashed var(--border)",
+          background: "var(--bg-surface)",
+        }}
+      >
+        Self-hosted runners execute untrusted PR code, so this workflow targets{" "}
+        <strong>private repositories</strong> — the fork guard still skips fork PRs, but
+        installing into a public repo is not advised.
+      </div>
+
+      {/* Self-hosted runner registration note (Edge 15) */}
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          padding: "10px 12px",
+          borderRadius: 7,
+          border: "1px dashed var(--border)",
+          background: "var(--bg-surface)",
+        }}
+      >
+        A self-hosted runner matching the configured label must be registered with the
+        target repo before jobs will run — otherwise they stay queued and never execute.
+      </div>
 
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -437,94 +594,94 @@ export function CiExportWizard({ agentId, agentName, onClose }: CiExportWizardPr
   const [triggers, setTriggers] = React.useState<string[]>(["opened", "synchronize"]);
   const [postAs, setPostAs] = React.useState<string>("github_review");
   const [workflowYaml, setWorkflowYaml] = React.useState("");
+  const [runnerLabel, setRunnerLabel] = React.useState(DEFAULT_RUNNER_LABEL_INPUT);
+  const [studioUrl, setStudioUrl] = React.useState(DEFAULT_STUDIO_URL_INPUT);
 
   // Preview state
   const [previewFiles, setPreviewFiles] = React.useState<CiFile[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
 
   // Install result state
-  const [installResult, setInstallResult] = React.useState<CiExport | null>(null);
+  const [installResult, setInstallResult] = React.useState<CiExportResult | null>(null);
   const [installError, setInstallError] = React.useState<string | null>(null);
+  const [installErrorCode, setInstallErrorCode] = React.useState<string | null>(null);
 
   const exportMutation = useExportCi(agentId);
+
+  // Shared request body — carries the runner label + studio URL collected on
+  // Configure into every export call (AC-E4b, AC-U9, AC-E6).
+  function buildExportBody(
+    action: "open_pr" | "files",
+    includeOverride: boolean,
+  ): CiExportInputBody & { runner_label: string[]; studio_url: string } {
+    return {
+      repo,
+      action,
+      post_as: postAs as "github_review" | "pr_comment" | "none",
+      triggers,
+      base: "main",
+      runner_label: parseRunnerLabel(runnerLabel),
+      studio_url: studioUrl,
+      ...(includeOverride && workflowYaml ? { workflow_override: workflowYaml } : {}),
+    };
+  }
+
+  function captureError(err: unknown) {
+    setInstallErrorCode(err instanceof ApiError ? (err.code ?? null) : null);
+    setInstallError(err instanceof Error ? err.message : String(err));
+  }
 
   // Load preview: call export with action:'files' and render returned files (AC-E2)
   function handleLoadPreview() {
     if (!repo) return;
     setIsLoadingPreview(true);
     setInstallError(null);
-    exportMutation.mutate(
-      {
-        repo,
-        action: "files",
-        post_as: postAs as "github_review" | "pr_comment" | "none",
-        triggers,
-        base: "main",
+    setInstallErrorCode(null);
+    exportMutation.mutate(buildExportBody("files", false), {
+      onSuccess: (data) => {
+        setPreviewFiles(data.files);
+        // Extract the editable workflow YAML for the textarea (AC-E3)
+        const yaml = extractWorkflowYaml(data.files);
+        setWorkflowYaml(yaml);
+        setIsLoadingPreview(false);
       },
-      {
-        onSuccess: (data) => {
-          setPreviewFiles(data.files);
-          // Extract the editable workflow YAML for the textarea (AC-E3)
-          const yaml = extractWorkflowYaml(data.files);
-          setWorkflowYaml(yaml);
-          setIsLoadingPreview(false);
-        },
-        onError: (err) => {
-          setInstallError(err instanceof Error ? err.message : String(err));
-          setIsLoadingPreview(false);
-        },
+      onError: (err) => {
+        captureError(err);
+        setIsLoadingPreview(false);
       },
-    );
+    });
   }
 
   // Install: open PR (AC-E4)
   function handleInstallPr() {
     setInstallError(null);
+    setInstallErrorCode(null);
     setInstallResult(null);
-    exportMutation.mutate(
-      {
-        repo,
-        action: "open_pr",
-        post_as: postAs as "github_review" | "pr_comment" | "none",
-        triggers,
-        base: "main",
-        ...(workflowYaml ? { workflow_override: workflowYaml } : {}),
+    exportMutation.mutate(buildExportBody("open_pr", true), {
+      onSuccess: (data) => {
+        setInstallResult(data);
       },
-      {
-        onSuccess: (data) => {
-          setInstallResult(data);
-        },
-        onError: (err) => {
-          setInstallError(err instanceof Error ? err.message : String(err));
-        },
+      onError: (err) => {
+        captureError(err);
       },
-    );
+    });
   }
 
   // Install: zip download (AC-E5)
   function handleInstallZip() {
     setInstallError(null);
+    setInstallErrorCode(null);
     setInstallResult(null);
-    exportMutation.mutate(
-      {
-        repo,
-        action: "files",
-        post_as: postAs as "github_review" | "pr_comment" | "none",
-        triggers,
-        base: "main",
-        ...(workflowYaml ? { workflow_override: workflowYaml } : {}),
+    exportMutation.mutate(buildExportBody("files", true), {
+      onSuccess: (data) => {
+        setInstallResult(data);
+        const blob = buildZip(data.files);
+        triggerDownload(blob, "devdigest-ci.zip");
       },
-      {
-        onSuccess: (data) => {
-          setInstallResult(data);
-          const blob = buildZip(data.files);
-          triggerDownload(blob, "devdigest-ci.zip");
-        },
-        onError: (err) => {
-          setInstallError(err instanceof Error ? err.message : String(err));
-        },
+      onError: (err) => {
+        captureError(err);
       },
-    );
+    });
   }
 
   const isPending = exportMutation.isPending;
@@ -607,6 +764,10 @@ export function CiExportWizard({ agentId, agentName, onClose }: CiExportWizardPr
           onTriggersChange={setTriggers}
           postAs={postAs}
           onPostAsChange={setPostAs}
+          runnerLabel={runnerLabel}
+          onRunnerLabelChange={setRunnerLabel}
+          studioUrl={studioUrl}
+          onStudioUrlChange={setStudioUrl}
         />
       )}
       {step === 3 && (
@@ -614,6 +775,7 @@ export function CiExportWizard({ agentId, agentName, onClose }: CiExportWizardPr
           repo={repo}
           isPending={isPending}
           error={installError}
+          errorCode={installErrorCode}
           result={installResult}
           onInstallPr={handleInstallPr}
           onInstallZip={handleInstallZip}

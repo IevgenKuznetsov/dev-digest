@@ -2,21 +2,24 @@ import { timingSafeEqual as nodeTse } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { CiExportInput, CiResultArtifact } from '@devdigest/shared';
+import { CiExportInput, CiResultArtifact, PerfWindow } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, ValidationError } from '../../platform/errors.js';
 import { CiService } from './service.js';
 import { CI_INGEST_TOKEN_KEY } from './constants.js';
+import { isPrivateNetworkStudioUrl, isSelfHostedRunnerLabel } from './helpers.js';
 
 /**
  * A6 — ci module routes.
  *
  * Routes:
- * - Step 7: POST /ci/ingest            — token-authed, NO getContext
- * - Step 9: GET  /ci/runs              — getContext, optional filters
- * - Step 9: GET  /ci/installations     — getContext, optional agent_id filter
- * - Step 9: POST /agents/:id/export-ci — getContext, delegates to service.exportCi
+ * - Step 7: POST   /ci/ingest              — token-authed, NO getContext
+ * - Step 9: GET    /ci/runs                — getContext, optional filters
+ * - Step 9: GET    /ci/installations       — getContext, optional agent_id filter
+ * - v2:     GET    /ci/performance         — getContext, windowed dashboard (AC-U1)
+ * - v2:     DELETE /ci/installations/:id   — getContext, removes one install row (AC-E5)
+ * - Step 9: POST   /agents/:id/export-ci   — getContext, delegates to service.exportCi
  *
  * IMPORTANT: POST /ci/ingest is the ONLY route that does NOT call getContext
  * (it authenticates via CI_INGEST_TOKEN instead). All other routes call
@@ -37,6 +40,42 @@ export const ExportBody = CiExportInput.extend({
    * to the devdigest/ci branch; never to main.
    */
   workflow_override: z.string().nullish(),
+  /**
+   * Self-hosted runner label for the generated workflow's `runs-on:` (AC-U9,
+   * AC-E4b). Falls back to DEFAULT_RUNNER_LABEL when omitted. Must include
+   * the literal `self-hosted` label — the spec mandates the studio is
+   * reachable ONLY via a self-hosted runner (never GitHub-hosted compute),
+   * and `runs-on:` silently routes to GitHub-hosted infra if that label is
+   * absent (see `isSelfHostedRunnerLabel` in helpers.ts).
+   */
+  runner_label: z
+    .array(z.string())
+    .min(1)
+    .refine(isSelfHostedRunnerLabel, {
+      message:
+        'runner_label must include the "self-hosted" label — GitHub-hosted runners ' +
+        'are not permitted (the studio is reachable only via a self-hosted runner)',
+    })
+    .optional(),
+  /**
+   * Studio base URL provisioned into the target repo's DEVDIGEST_STUDIO_URL
+   * Actions variable (AC-E6, AC-E4b). Falls back to DEFAULT_STUDIO_URL when
+   * omitted. Never interpolated directly into workflow YAML (AC-U7). Must
+   * resolve to a private-network host (localhost / RFC1918) — the spec
+   * mandates the studio is reachable only via a self-hosted runner on the
+   * operator's private network, never a public tunnel/relay. Rejecting
+   * public hosts here also prevents an attacker-controlled `studio_url`
+   * from exfiltrating the shared CI_INGEST_TOKEN.
+   */
+  studio_url: z
+    .string()
+    .min(1)
+    .refine(isPrivateNetworkStudioUrl, {
+      message:
+        'studio_url must be an http(s) URL pointing to a private-network host ' +
+        '(localhost, 127.0.0.1, or an RFC1918 private range) — public/tunnel URLs are not permitted',
+    })
+    .optional(),
 }).refine(
   (b) => /^[^/\s]+\/[^/\s]+$/.test(b.repo),
   { message: 'repo must be in "owner/name" format', path: ['repo'] },
@@ -77,6 +116,17 @@ const CiRunsQuery = z.object({
  */
 const CiInstallationsQuery = z.object({
   agent_id: z.string().uuid().optional(),
+});
+
+/**
+ * Query schema for GET /ci/performance.
+ *
+ * `window` defaults to '30' when absent (AC-O3). A present-but-invalid value
+ * (not in {7,30,90}) fails Fastify/Zod schema validation and is rejected
+ * with 422 by the app's error handler (AC-UN1) — no silent fallback.
+ */
+const CiPerformanceQuery = z.object({
+  window: PerfWindow.default('30'),
 });
 
 // ---- Plugin -----------------------------------------------------------------
@@ -161,13 +211,41 @@ export default async function ciRoutes(appBase: FastifyInstance) {
     '/ci/installations',
     { schema: { querystring: CiInstallationsQuery } },
     async (req) => {
-      await getContext(app.container, req);
+      const { workspaceId } = await getContext(app.container, req);
       const { agent_id } = req.query;
       if (!agent_id) {
         // Return empty array when no agent_id provided — installations are agent-scoped.
         return [];
       }
-      return service.listInstallations(agent_id);
+      return service.listInstallations(workspaceId, agent_id);
+    },
+  );
+
+  // ---- GET /ci/performance ----------------------------------------------------
+  // Agent Performance dashboard (AC-U1, AC-E1). `window` defaults to '30' and is
+  // rejected with 422 when present but out of the {7,30,90} allow-list (AC-UN1,
+  // AC-O3) — Zod schema validation handles both via the app's error handler.
+
+  app.get(
+    '/ci/performance',
+    { schema: { querystring: CiPerformanceQuery } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const { window } = req.query;
+      return service.getPerformance(workspaceId, window);
+    },
+  );
+
+  // ---- DELETE /ci/installations/:id -------------------------------------------
+  // Removes only the installation row; ci_runs are preserved (AC-E5).
+
+  app.delete(
+    '/ci/installations/:id',
+    { schema: { params: IdParams } },
+    async (req, reply) => {
+      const { workspaceId } = await getContext(app.container, req);
+      await service.removeInstallation(req.params.id, workspaceId);
+      return reply.status(204).send();
     },
   );
 

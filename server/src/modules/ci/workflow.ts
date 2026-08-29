@@ -17,12 +17,28 @@ import {
   UPLOAD_ARTIFACT_SHA,
   RUNNER_PATH,
   RESULT_FILE,
+  DEFAULT_RUNNER_LABEL,
+  DEVDIGEST_STUDIO_URL_VAR,
 } from './constants.js';
 
 export interface GenerateWorkflowInput {
   triggers: string[];
   postAs: 'github_review' | 'pr_comment' | 'none';
   base: string;
+  /**
+   * `runs-on:` label set for the job (AC-U9). Defaults to
+   * `DEFAULT_RUNNER_LABEL` (`['self-hosted', 'devdigest']`) when omitted.
+   * No tunnel/relay config is emitted for this.
+   */
+  runnerLabel?: string[];
+  /**
+   * Accepted for interface completeness / future provisioning callers
+   * (Step 7/8's `CiProvisioner.setActionsVariable`). NOT interpolated into
+   * the generated YAML — the ingest step always reads the studio URL from
+   * the `${{ vars.DEVDIGEST_STUDIO_URL }}` repo Variable at run time, never
+   * a raw literal baked in at generation time (AC-U7).
+   */
+  studioUrl?: string;
 }
 
 /**
@@ -71,7 +87,8 @@ export function generateWorkflow(input: GenerateWorkflowInput): string {
     jobs: {
       'devdigest-review': {
         name: 'DevDigest Review',
-        'runs-on': 'ubuntu-latest',
+        // Self-hosted runner (AC-U9) — no GitHub-hosted fallback, no tunnel/relay.
+        'runs-on': input.runnerLabel ?? DEFAULT_RUNNER_LABEL,
 
         // Fork PR guard (AC-UN5): skip this job entirely when the PR head
         // originates from a fork. Forked PRs have no access to repository
@@ -132,17 +149,43 @@ export function generateWorkflow(input: GenerateWorkflowInput): string {
             },
           },
 
-          // POST /ci/ingest call (documented; live round-trip is out of scope for v1).
-          // When the studio is publicly reachable, uncomment and set DEVDIGEST_STUDIO_URL
-          // as a secret in the target repo.
-          //
-          // - name: Ingest result into DevDigest Studio
-          //   if: always()
-          //   run: |
-          //     curl -s -X POST "${DEVDIGEST_STUDIO_URL}/ci/ingest" \
-          //       -H "Authorization: Bearer ${{ secrets.CI_INGEST_TOKEN }}" \
-          //       -H "Content-Type: application/json" \
-          //       --data-binary "@devdigest-result.json"
+          {
+            name: 'Ingest result into DevDigest Studio',
+            // Best-effort — must run and never fail the job (AC-E7, AC-UN4).
+            if: 'always()',
+            env: {
+              // Studio URL comes only from the repo Variable set during
+              // provisioning — never a raw literal baked into the workflow
+              // (AC-U7). Empty when provisioning hasn't run — the script
+              // below no-ops in that case (AC-ST2).
+              [DEVDIGEST_STUDIO_URL_VAR]: `\${{ vars.${DEVDIGEST_STUDIO_URL_VAR} }}`,
+              // Token reference only, never a raw value (AC-U7).
+              CI_INGEST_TOKEN: '${{ secrets.CI_INGEST_TOKEN }}',
+              PR_REPOSITORY: '${{ github.repository }}',
+              PR_HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
+            },
+            run: [
+              `if [ -z "$${DEVDIGEST_STUDIO_URL_VAR}" ]; then`,
+              `  echo "${DEVDIGEST_STUDIO_URL_VAR} not set; skipping ingest."`,
+              '  exit 0',
+              'fi',
+              'if ! command -v jq >/dev/null 2>&1; then',
+              '  echo "jq not found; skipping ingest."',
+              '  exit 0',
+              'fi',
+              'PAYLOAD="$(jq -c --arg repo "$PR_REPOSITORY" --arg sha "$PR_HEAD_SHA" \'. + {repository: $repo, commit_sha: $sha}\' ' +
+                `${RESULT_FILE} 2>/dev/null || echo "")"`,
+              'if [ -z "$PAYLOAD" ]; then',
+              '  echo "Could not build ingest payload; skipping."',
+              '  exit 0',
+              'fi',
+              `curl -s -X POST "$${DEVDIGEST_STUDIO_URL_VAR}/ci/ingest" \\`,
+              '  -H "Authorization: Bearer $CI_INGEST_TOKEN" \\',
+              '  -H "Content-Type: application/json" \\',
+              '  --data-binary "$PAYLOAD" \\',
+              '  || true',
+            ].join('\n'),
+          },
         ],
       },
     },

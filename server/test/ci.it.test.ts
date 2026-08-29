@@ -279,7 +279,8 @@ d('CI module — DB-backed routes via app.inject', () => {
 
   describe('POST /agents/:id/export-ci + ingest flow (AC-E6, AC-UN6)', () => {
     it('export-ci returns a CiExport with installation, files, and pr_url', async () => {
-      const app = await makeApp();
+      const secrets = new MockSecretsProvider({ CI_INGEST_TOKEN: 'export-tok' });
+      const app = await makeApp(secrets);
 
       const res = await app.inject({
         method: 'POST',

@@ -7,8 +7,8 @@
 import React from "react";
 import { Button, Skeleton, EmptyState } from "@devdigest/ui";
 import type { Agent } from "@devdigest/shared";
-import type { CiInstallation, CiRun } from "@devdigest/shared";
-import { useCiInstallations, useCiRuns } from "@/lib/hooks/ci";
+import type { CiInstallationView, CiRun } from "@devdigest/shared";
+import { useCiInstallations, useCiRuns, useRemoveInstallation } from "@/lib/hooks/ci";
 import { CiExportWizard } from "@/components/CiExportWizard";
 import {
   WORKFLOW_VERSION_LABEL,
@@ -18,19 +18,27 @@ import {
 } from "./constants";
 
 // ---------------------------------------------------------------------------
-// Extended CiInstallation type — the server returns agent_version in addition
-// to the base contract fields (vendor/shared/contracts/eval-ci.ts is read-only,
-// so we extend the type locally for the tab's display needs).
-// ---------------------------------------------------------------------------
-type CiInstallationWithVersion = CiInstallation & { agent_version?: number | null };
-
-// ---------------------------------------------------------------------------
-// InstallationCard — renders one ci_installations row
+// InstallationCard — renders one ci_installations row (AC-E3, AC-ST3).
+// Each row shows its own repo, target type, last_status, last_run_at, and a
+// per-repo Remove action gated by a confirm step — actions never touch any
+// other installation's row.
 // ---------------------------------------------------------------------------
 
-function InstallationCard({ installation }: { installation: CiInstallationWithVersion }) {
+function InstallationCard({
+  installation,
+  onRemove,
+  isRemoving,
+}: {
+  installation: CiInstallationView;
+  onRemove: (id: string) => void;
+  isRemoving: boolean;
+}) {
+  const [confirming, setConfirming] = React.useState(false);
   const installedDate = new Date(installation.installed_at).toLocaleDateString();
   const agentVersion = installation.agent_version;
+  const lastRunDate = installation.last_run_at
+    ? new Date(installation.last_run_at).toLocaleString()
+    : null;
 
   return (
     <div
@@ -69,6 +77,54 @@ function InstallationCard({ installation }: { installation: CiInstallationWithVe
         >
           {installation.target_type}
         </span>
+        {installation.last_status && (
+          <span
+            style={{
+              fontSize: 11,
+              padding: "2px 8px",
+              borderRadius: 99,
+              background: "var(--bg-hover)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {installation.last_status}
+          </span>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        {/* Per-repo Remove action with a confirm step — operates only on this row */}
+        {!confirming ? (
+          <Button
+            kind="danger"
+            size="sm"
+            icon="Trash"
+            onClick={() => setConfirming(true)}
+            disabled={isRemoving}
+          >
+            Remove
+          </Button>
+        ) : (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Remove this repo?</span>
+            <Button
+              kind="danger"
+              size="sm"
+              loading={isRemoving}
+              onClick={() => onRemove(installation.id)}
+            >
+              Confirm
+            </Button>
+            <Button
+              kind="ghost"
+              size="sm"
+              onClick={() => setConfirming(false)}
+              disabled={isRemoving}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Metadata row */}
@@ -88,6 +144,7 @@ function InstallationCard({ installation }: { installation: CiInstallationWithVe
             {WORKFLOW_VERSION_LABEL}: <strong>v{agentVersion}</strong>
           </span>
         )}
+        <span>Last run: {lastRunDate ?? "—"}</span>
       </div>
     </div>
   );
@@ -192,6 +249,18 @@ export function CiTab({ agent }: { agent: Agent }) {
     error: runsError,
   } = useCiRuns({ agent: agent.id });
 
+  const removeMutation = useRemoveInstallation();
+  const [removingId, setRemovingId] = React.useState<string | null>(null);
+
+  function handleRemove(id: string) {
+    setRemovingId(id);
+    removeMutation.mutate(id, {
+      onSettled: () => setRemovingId(null),
+    });
+  }
+
+  const installationCount = installations?.length ?? 0;
+
   // ---------------------------------------------------------------------------
   // Installations section
   // ---------------------------------------------------------------------------
@@ -227,8 +296,17 @@ export function CiTab({ agent }: { agent: Agent }) {
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {(installations as CiInstallationWithVersion[]).map((inst) => (
-          <InstallationCard key={inst.id} installation={inst} />
+        {/* Active in N repos summary (AC-E3, AC-ST3) */}
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          Active in {installationCount} {installationCount === 1 ? "repo" : "repos"}
+        </div>
+        {installations.map((inst) => (
+          <InstallationCard
+            key={inst.id}
+            installation={inst}
+            onRemove={handleRemove}
+            isRemoving={removingId === inst.id && removeMutation.isPending}
+          />
         ))}
       </div>
     );
@@ -318,14 +396,16 @@ export function CiTab({ agent }: { agent: Agent }) {
             Run this agent automatically on pull requests in a target repository.
           </div>
         </div>
-        {/* Add to CI button (AC-E1) */}
+        {/* Add to CI / Add repository button — opens the Export Wizard, reused
+            unchanged from v1 (AC-E1, AC-E3). Relabeled once at least one
+            installation exists, since it now adds another repo. */}
         <Button
           kind="primary"
           size="sm"
           icon="Workflow"
           onClick={() => setWizardOpen(true)}
         >
-          Add to CI
+          {installationCount > 0 ? "Add repository" : "Add to CI"}
         </Button>
       </div>
 

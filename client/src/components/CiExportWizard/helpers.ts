@@ -38,3 +38,14 @@ export function triggerDownload(blob: Blob, filename: string): void {
 export function extractWorkflowYaml(files: CiFile[]): string {
   return files.find((f) => f.editable)?.contents ?? "";
 }
+
+/**
+ * Parse a comma-separated runner label input (e.g. "self-hosted, devdigest")
+ * into a label array for the export request body (AC-U9, AC-E4b).
+ */
+export function parseRunnerLabel(input: string): string[] {
+  return input
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}

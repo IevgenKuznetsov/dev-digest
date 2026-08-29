@@ -2,7 +2,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { CiExportWizard } from "./CiExportWizard";
-import type { CiExport } from "@devdigest/shared";
+import type { CiExportResult } from "@/lib/hooks/ci";
+import { ApiError } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Module-level mock state — each test controls mutate/isPending via the
@@ -65,7 +66,7 @@ function renderWizard(agentId = "agent-1", onClose = vi.fn()) {
   );
 }
 
-const MOCK_PR_EXPORT: CiExport = {
+const MOCK_PR_EXPORT: CiExportResult = {
   installation: {
     id: "inst-1",
     agent_id: "agent-1",
@@ -86,11 +87,13 @@ const MOCK_PR_EXPORT: CiExport = {
     },
   ],
   pr_url: "https://github.com/owner/repo/pull/42",
+  ingest_wiring: { status: "ok" },
 };
 
-const MOCK_FILES_EXPORT: CiExport = {
+const MOCK_FILES_EXPORT: CiExportResult = {
   ...MOCK_PR_EXPORT,
   pr_url: null,
+  ingest_wiring: { status: "skipped" },
 };
 
 // Navigate wizard to a specific step by clicking through each step
@@ -199,7 +202,7 @@ describe("CiExportWizard", () => {
 
   it("edited YAML is passed as workflow_override on PR install (AC-E3)", () => {
     currentMutate = vi.fn().mockImplementation(
-      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExport) => void }) => {
+      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExportResult) => void }) => {
         onSuccess(MOCK_PR_EXPORT);
       },
     );
@@ -216,7 +219,7 @@ describe("CiExportWizard", () => {
 
   it("on PR success, shows the pr_url (AC-E4)", async () => {
     currentMutate = vi.fn().mockImplementation(
-      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExport) => void }) => {
+      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExportResult) => void }) => {
         onSuccess(MOCK_PR_EXPORT);
       },
     );
@@ -234,7 +237,7 @@ describe("CiExportWizard", () => {
 
   it("on ZIP download, calls mutate with action:files (AC-E5)", () => {
     currentMutate = vi.fn().mockImplementation(
-      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExport) => void }) => {
+      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExportResult) => void }) => {
         onSuccess(MOCK_FILES_EXPORT);
       },
     );
@@ -282,5 +285,101 @@ describe("CiExportWizard", () => {
     await waitFor(() => {
       expect(screen.getByText(/GitHub API rate limit exceeded/i)).toBeInTheDocument();
     });
+  });
+
+  it("Configure step renders runner label and studio URL inputs with defaults (AC-E4b, AC-U9)", () => {
+    renderWizard();
+    navigateToStep(2);
+    expect(screen.getByLabelText("Self-hosted Runner Label")).toHaveValue(
+      "self-hosted, devdigest",
+    );
+    expect(screen.getByLabelText("Studio URL")).toHaveValue("http://localhost:3001");
+  });
+
+  it("runner label and studio URL are carried into the export request body (AC-E4b)", () => {
+    currentMutate = vi.fn().mockImplementation(
+      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExportResult) => void }) => {
+        onSuccess(MOCK_PR_EXPORT);
+      },
+    );
+
+    renderWizard();
+    navigateToStep(3);
+    fireEvent.click(screen.getByRole("button", { name: /open pr/i }));
+
+    expect(currentMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runner_label: ["self-hosted", "devdigest"],
+        studio_url: "http://localhost:3001",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("shows the ingest wiring success message when provisioning succeeds (AC-E6)", async () => {
+    currentMutate = vi.fn().mockImplementation(
+      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExportResult) => void }) => {
+        onSuccess(MOCK_PR_EXPORT);
+      },
+    );
+
+    renderWizard();
+    navigateToStep(3);
+    fireEvent.click(screen.getByRole("button", { name: /open pr/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Ingest wiring configured/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows a distinct 'incomplete' warning when provisioning fails but the PR opened (AC-UN2)", async () => {
+    currentMutate = vi.fn().mockImplementation(
+      (_body: unknown, { onSuccess }: { onSuccess: (data: CiExportResult) => void }) => {
+        onSuccess({
+          ...MOCK_PR_EXPORT,
+          ingest_wiring: { status: "incomplete", error: "missing admin scope" },
+        });
+      },
+    );
+
+    renderWizard();
+    navigateToStep(3);
+    fireEvent.click(screen.getByRole("button", { name: /open pr/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/ingest wiring is incomplete/i)).toBeInTheDocument();
+      expect(screen.getByText(/missing admin scope/i)).toBeInTheDocument();
+    });
+  });
+
+  it("surfaces the pre-flight ci_ingest_token_missing error distinctly (AC-O2)", async () => {
+    currentMutate = vi.fn().mockImplementation(
+      (_body: unknown, { onError }: { onError: (err: Error) => void }) => {
+        onError(
+          new ApiError(
+            "CI_INGEST_TOKEN is not configured",
+            422,
+            "ci_ingest_token_missing",
+          ),
+        );
+      },
+    );
+
+    renderWizard();
+    navigateToStep(3);
+    fireEvent.click(screen.getByRole("button", { name: /open pr/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Studio CI_INGEST_TOKEN not configured/i)).toBeInTheDocument();
+    });
+  });
+
+  it("renders the private-repo advisory and self-hosted runner registration note (Edge 15, Edge 16)", () => {
+    renderWizard();
+    navigateToStep(3);
+    expect(screen.getByText(/private repositories/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/self-hosted runner matching the configured label/i),
+    ).toBeInTheDocument();
   });
 });

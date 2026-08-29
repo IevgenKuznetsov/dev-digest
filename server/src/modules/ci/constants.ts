@@ -53,3 +53,27 @@ export const SETUP_NODE_SHA = '49933ea5288caeca8642d1e84afbd3f7d6820020';
  * Source: https://api.github.com/repos/actions/upload-artifact/git/refs/tags/v4
  */
 export const UPLOAD_ARTIFACT_SHA = 'ea165f8d65b6e75b540449e92b4886f43607fa02';
+
+// ---- Self-hosted runner + ingest defaults (v2) ------------------------------
+
+/**
+ * Default `runs-on:` label set for the generated workflow (AC-U9). DevDigest
+ * agents run against a self-hosted runner rather than GitHub-hosted compute —
+ * no tunnel/relay config is emitted alongside this.
+ */
+export const DEFAULT_RUNNER_LABEL = ['self-hosted', 'devdigest'];
+
+/**
+ * Default studio base URL used when a caller does not supply one. Only used
+ * for local/dev provisioning defaults (e.g. `CiProvisioner.setActionsVariable`
+ * in Step 7/8) — never interpolated directly into the generated YAML (AC-U7).
+ */
+export const DEFAULT_STUDIO_URL = 'http://localhost:3001';
+
+/**
+ * Name of the GitHub Actions repo Variable that carries the studio base URL
+ * at workflow run time. The workflow reads it via `${{ vars.DEVDIGEST_STUDIO_URL }}`
+ * — never a raw literal (AC-U7). The variable itself is provisioned by
+ * `CiProvisioner.setActionsVariable` (Step 7/8).
+ */
+export const DEVDIGEST_STUDIO_URL_VAR = 'DEVDIGEST_STUDIO_URL';

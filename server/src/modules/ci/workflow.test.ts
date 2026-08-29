@@ -11,6 +11,7 @@ import {
   CHECKOUT_SHA,
   SETUP_NODE_SHA,
   UPLOAD_ARTIFACT_SHA,
+  DEFAULT_RUNNER_LABEL,
 } from './constants.js';
 
 function parseWorkflow(yaml: string): Record<string, unknown> {
@@ -202,6 +203,106 @@ describe('generateWorkflow', () => {
     it('includes GITHUB_TOKEN from secrets', () => {
       const yaml = generateWorkflow(defaultInput);
       expect(yaml).toContain('${{ secrets.GITHUB_TOKEN }}');
+    });
+  });
+
+  describe('self-hosted runner (AC-U9)', () => {
+    it('defaults `runs-on` to the default runner label when not provided', () => {
+      const yaml = generateWorkflow(defaultInput);
+      const wf = parseWorkflow(yaml);
+      const jobs = wf['jobs'] as Record<string, { 'runs-on': string[] }>;
+      expect(Object.values(jobs)[0]!['runs-on']).toEqual(DEFAULT_RUNNER_LABEL);
+    });
+
+    it('uses a caller-supplied runnerLabel when provided', () => {
+      const yaml = generateWorkflow({ ...defaultInput, runnerLabel: ['self-hosted', 'custom-label'] });
+      const wf = parseWorkflow(yaml);
+      const jobs = wf['jobs'] as Record<string, { 'runs-on': string[] }>;
+      expect(Object.values(jobs)[0]!['runs-on']).toEqual(['self-hosted', 'custom-label']);
+    });
+
+    it('does not use `ubuntu-latest`', () => {
+      const yaml = generateWorkflow(defaultInput);
+      expect(yaml).not.toContain('ubuntu-latest');
+    });
+
+    it('does not emit any tunnel/relay configuration', () => {
+      const yaml = generateWorkflow(defaultInput);
+      expect(yaml.toLowerCase()).not.toContain('tunnel');
+      expect(yaml.toLowerCase()).not.toContain('relay');
+    });
+  });
+
+  describe('active best-effort ingest step (AC-E7, AC-ST2, AC-UN4, AC-U7)', () => {
+    it('includes an "Ingest result into DevDigest Studio" step with if: always()', () => {
+      const yaml = generateWorkflow(defaultInput);
+      const wf = parseWorkflow(yaml);
+      const jobs = wf['jobs'] as Record<string, { steps: { name?: string; if?: string }[] }>;
+      const ingestStep = Object.values(jobs)[0]!.steps.find(
+        (s) => s.name === 'Ingest result into DevDigest Studio',
+      );
+      expect(ingestStep).toBeDefined();
+      expect(ingestStep?.if).toBe('always()');
+    });
+
+    it('is no longer commented out (an active `curl` call is present)', () => {
+      const yaml = generateWorkflow(defaultInput);
+      expect(yaml).toContain('curl');
+      // The old commented placeholder used a `#` prefix on `curl` lines.
+      const curlLines = yaml.split('\n').filter((l) => l.includes('curl'));
+      expect(curlLines.some((l) => !l.trim().startsWith('#'))).toBe(true);
+    });
+
+    it('references CI_INGEST_TOKEN only via ${{ secrets.CI_INGEST_TOKEN }}', () => {
+      const yaml = generateWorkflow(defaultInput);
+      expect(yaml).toContain('${{ secrets.CI_INGEST_TOKEN }}');
+    });
+
+    it('references the studio URL only via ${{ vars.DEVDIGEST_STUDIO_URL }}, never a raw literal', () => {
+      const yaml = generateWorkflow(defaultInput);
+      expect(yaml).toContain('${{ vars.DEVDIGEST_STUDIO_URL }}');
+      expect(yaml).not.toContain('http://localhost:3001');
+    });
+
+    it('no-ops (exits 0) when DEVDIGEST_STUDIO_URL is empty', () => {
+      const yaml = generateWorkflow(defaultInput);
+      expect(yaml).toContain('DEVDIGEST_STUDIO_URL');
+      expect(yaml).toContain('exit 0');
+    });
+
+    it('never fails the job — tolerates curl failure via `|| true`', () => {
+      const yaml = generateWorkflow(defaultInput);
+      const lines = yaml.split('\n');
+      const curlLineIdx = lines.findIndex((l) => l.includes('curl -s -X POST'));
+      expect(curlLineIdx).toBeGreaterThanOrEqual(0);
+      // The curl invocation (possibly spanning multiple continuation lines)
+      // must eventually be followed by `|| true` before the step ends.
+      const tail = lines.slice(curlLineIdx, curlLineIdx + 6).join('\n');
+      expect(tail).toContain('|| true');
+    });
+  });
+
+  describe('permissions unchanged with new fields present (AC-U6)', () => {
+    it('still sets exactly contents:read + pull-requests:write when runnerLabel/studioUrl provided', () => {
+      const yaml = generateWorkflow({
+        ...defaultInput,
+        runnerLabel: ['self-hosted', 'custom'],
+        studioUrl: 'https://studio.example.com',
+      });
+      const wf = parseWorkflow(yaml);
+      const perms = wf['permissions'] as Record<string, string>;
+      expect(perms).toEqual({ contents: 'read', 'pull-requests': 'write' });
+    });
+  });
+
+  describe('fork guard still present (AC-UN3)', () => {
+    it('contains the fork if-guard on the job when new fields are provided', () => {
+      const yaml = generateWorkflow({
+        ...defaultInput,
+        runnerLabel: ['self-hosted', 'custom'],
+        studioUrl: 'https://studio.example.com',
+      });
+      expect(yaml).toContain('github.event.pull_request.head.repo.fork == false');
     });
   });
 });

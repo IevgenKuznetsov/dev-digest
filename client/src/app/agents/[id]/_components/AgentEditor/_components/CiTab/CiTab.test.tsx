@@ -4,7 +4,7 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { Agent } from "@devdigest/shared";
-import type { CiInstallation, CiRun } from "@devdigest/shared";
+import type { CiInstallationView, CiRun } from "@devdigest/shared";
 import { CiTab } from "./CiTab";
 
 // ---------------------------------------------------------------------------
@@ -15,6 +15,7 @@ vi.mock("@/lib/hooks/ci", () => ({
   useCiInstallations: vi.fn(() => ({ data: undefined, isLoading: true, error: null })),
   useCiRuns: vi.fn(() => ({ data: undefined, isLoading: true, error: null })),
   useExportCi: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useRemoveInstallation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock("@/components/CiExportWizard", () => ({
@@ -45,13 +46,26 @@ const AGENT: Agent = {
   version: 3,
 };
 
-const INSTALLATION: CiInstallation & { agent_version: number } = {
+const INSTALLATION: CiInstallationView = {
   id: "inst-1",
   agent_id: "agent-1",
   repo: "acme/payments-api",
   target_type: "gha",
   installed_at: new Date("2026-01-15T10:00:00Z").toISOString(),
   agent_version: 2,
+  last_status: "succeeded",
+  last_run_at: new Date("2026-01-16T12:00:00Z").toISOString(),
+};
+
+const INSTALLATION_2: CiInstallationView = {
+  id: "inst-2",
+  agent_id: "agent-1",
+  repo: "acme/billing-service",
+  target_type: "gha",
+  installed_at: new Date("2026-01-18T10:00:00Z").toISOString(),
+  agent_version: 3,
+  last_status: null,
+  last_run_at: null,
 };
 
 const RUN: CiRun = {
@@ -138,7 +152,9 @@ describe("CiTab", () => {
     wrap(<CiTab agent={AGENT} />);
 
     expect(screen.getByText("#42")).toBeInTheDocument();
-    expect(screen.getByText("succeeded")).toBeInTheDocument();
+    // "succeeded" also appears on the installation's last_status badge, so
+    // assert at least one match rather than a single unique node.
+    expect(screen.getAllByText("succeeded").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("3 findings")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /view job/i })).toHaveAttribute(
       "href",
@@ -192,5 +208,63 @@ describe("CiTab", () => {
     // Close wizard
     fireEvent.click(screen.getByRole("button", { name: /close wizard/i }));
     expect(screen.queryByTestId("ci-export-wizard")).not.toBeInTheDocument();
+  });
+
+  it("renders one row per installation with an 'Active in N repos' summary (AC-E3, AC-ST3)", async () => {
+    const { useCiInstallations, useCiRuns } = await import("@/lib/hooks/ci");
+    vi.mocked(useCiInstallations).mockReturnValue({
+      data: [INSTALLATION, INSTALLATION_2],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCiInstallations>);
+    vi.mocked(useCiRuns).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCiRuns>);
+
+    wrap(<CiTab agent={AGENT} />);
+
+    expect(screen.getByText("acme/payments-api")).toBeInTheDocument();
+    expect(screen.getByText("acme/billing-service")).toBeInTheDocument();
+    expect(screen.getByText(/Active in 2 repos/i)).toBeInTheDocument();
+    // last_status rendered per-row
+    expect(screen.getByText("succeeded")).toBeInTheDocument();
+    // Button relabeled once installations exist (AC-E3)
+    expect(screen.getByRole("button", { name: /add repository/i })).toBeInTheDocument();
+  });
+
+  it("per-repo Remove requires a confirm step and only removes that row's installation", async () => {
+    const { useCiInstallations, useCiRuns, useRemoveInstallation } = await import(
+      "@/lib/hooks/ci"
+    );
+    vi.mocked(useCiInstallations).mockReturnValue({
+      data: [INSTALLATION, INSTALLATION_2],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCiInstallations>);
+    vi.mocked(useCiRuns).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCiRuns>);
+    const removeMutate = vi.fn();
+    vi.mocked(useRemoveInstallation).mockReturnValue({
+      mutate: removeMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useRemoveInstallation>);
+
+    wrap(<CiTab agent={AGENT} />);
+
+    // Remove is not fired on the initial click — a confirm step is required
+    const removeButtons = screen.getAllByRole("button", { name: /^remove$/i });
+    expect(removeButtons).toHaveLength(2);
+    fireEvent.click(removeButtons[0]!);
+    expect(removeMutate).not.toHaveBeenCalled();
+
+    // Confirming removes only the clicked row's installation id
+    fireEvent.click(screen.getByRole("button", { name: /confirm/i }));
+    expect(removeMutate).toHaveBeenCalledWith("inst-1", expect.any(Object));
+    expect(removeMutate).not.toHaveBeenCalledWith("inst-2", expect.any(Object));
   });
 });

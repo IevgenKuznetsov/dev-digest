@@ -54,3 +54,9 @@ export const PUBLISH_MODES = [
   { key: "pr_comment", label: "PR Comment" },
   { key: "none", label: "None — upload artifact only" },
 ] as const;
+
+/** Default self-hosted runner `runs-on:` label input (AC-U9, AC-E4b). */
+export const DEFAULT_RUNNER_LABEL_INPUT = "self-hosted, devdigest";
+
+/** Default studio base URL, provisioned as the `DEVDIGEST_STUDIO_URL` repo variable (AC-E4b, AC-E6). */
+export const DEFAULT_STUDIO_URL_INPUT = "http://localhost:3001";

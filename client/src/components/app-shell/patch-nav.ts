@@ -32,6 +32,19 @@ const MULTI_AGENT_ITEM = {
   gKey: "m",
 };
 
+// gKey "f" chosen for Agent Performance (mnemonic: perFormance) — avoids
+// collision with "c" (conventions), "e" (eval), "s" (skills), "a" (agents),
+// "p" (pulls), "o" (onboarding), "x" (context), "r" (CI Runs), "m" (multi-
+// agent review). Kept distinct from the Eval Dashboard item — both remain
+// in nav (Step 14).
+const AGENT_PERFORMANCE_ITEM = {
+  key: "agent-performance",
+  label: "Agent Performance",
+  icon: "Gauge" as const,
+  href: "/agent-performance",
+  gKey: "f",
+};
+
 // Append to SKILLS LAB section (index 1) if not already present.
 const skillsLab = NAV.find((g) => g.section === "SKILLS LAB");
 if (skillsLab && !skillsLab.items.some((it) => it.key === "eval")) {
@@ -42,4 +55,15 @@ if (skillsLab && !skillsLab.items.some((it) => it.key === "ci-runs")) {
 }
 if (skillsLab && !skillsLab.items.some((it) => it.key === "multi-agent-review")) {
   skillsLab.items.push(MULTI_AGENT_ITEM);
+}
+
+// Vendor NAV has no GLOBAL section — create it (sanctioned extension point,
+// vendor/ui is read-only) and push the Agent Performance item into it.
+let global = NAV.find((g) => g.section === "GLOBAL");
+if (!global) {
+  global = { section: "GLOBAL", items: [] };
+  NAV.push(global);
+}
+if (!global.items.some((it) => it.key === "agent-performance")) {
+  global.items.push(AGENT_PERFORMANCE_ITEM);
 }

@@ -5,10 +5,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 import type {
   CiRun,
-  CiInstallation,
   CiExport,
   CiExportInputBody,
+  CiInstallationView,
+  AgentPerformance,
+  PerfWindow,
 } from "@devdigest/shared";
+
+// ---------------------------------------------------------------------------
+// CiExportResult — the actual shape returned by POST /agents/:id/export-ci.
+// The route has no response schema, so `ingest_wiring` isn't part of the
+// `@devdigest/shared` `CiExport` contract; it's appended server-side
+// (server/src/modules/ci/service.ts CiExportResult). Typed locally here.
+// ---------------------------------------------------------------------------
+export interface IngestWiring {
+  status: "ok" | "skipped" | "incomplete";
+  error?: string;
+}
+export interface CiExportResult extends CiExport {
+  ingest_wiring: IngestWiring;
+}
 
 // ---------------------------------------------------------------------------
 // Poll interval for CI run auto-refresh (AC-ST3). Spec window: 15–30 s.
@@ -47,13 +63,15 @@ export function useCiRuns(filters: CiRunsFilters = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// useCiInstallations — installations for one agent (AC-E8)
+// useCiInstallations — installations for one agent (AC-E8, AC-E3/AC-ST3)
+// Server now returns CiInstallationView (adds agent_version, last_status,
+// last_run_at) for every row.
 // ---------------------------------------------------------------------------
 export function useCiInstallations(agentId: string | null | undefined) {
   return useQuery({
     queryKey: ["ci-installations", agentId],
     queryFn: () =>
-      api.get<CiInstallation[]>(`/ci/installations?agent_id=${agentId}`),
+      api.get<CiInstallationView[]>(`/ci/installations?agent_id=${agentId}`),
     enabled: !!agentId,
   });
 }
@@ -66,10 +84,35 @@ export function useExportCi(agentId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CiExportInputBody) =>
-      api.post<CiExport>(`/agents/${agentId}/export-ci`, body),
+      api.post<CiExportResult>(`/agents/${agentId}/export-ci`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ci-installations", agentId] });
       qc.invalidateQueries({ queryKey: ["ci-runs"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// useAgentPerformance — GET /ci/performance?window= (Agent Performance dash)
+// ---------------------------------------------------------------------------
+export function useAgentPerformance(window: PerfWindow = "30") {
+  return useQuery({
+    queryKey: ["ci-performance", window],
+    queryFn: () => api.get<AgentPerformance>(`/ci/performance?window=${window}`),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// useRemoveInstallation — mutation: DELETE /ci/installations/:id
+// No request body (DELETE) — server returns 204, handled by apiFetch as
+// `undefined`. Invalidates the installations query on success.
+// ---------------------------------------------------------------------------
+export function useRemoveInstallation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<void>(`/ci/installations/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ci-installations"] });
     },
   });
 }
