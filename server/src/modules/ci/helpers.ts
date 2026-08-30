@@ -323,7 +323,7 @@ export function manifestFromAgent(
 function repoRoot(): string {
   const thisFile = fileURLToPath(import.meta.url);
   // Walk up: helpers.ts → ci/ → modules/ → src/ → server/ → repo root
-  return path.resolve(path.dirname(thisFile), '..', '..', '..', '..', '..');
+  return path.resolve(path.dirname(thisFile), '..', '..', '..', '..');
 }
 
 /**

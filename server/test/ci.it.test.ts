@@ -26,12 +26,9 @@ import { MockGitHubClient, MockSecretsProvider } from '../src/adapters/mocks.js'
 // ---------------------------------------------------------------------------
 // Stub runner bundle setup
 // ---------------------------------------------------------------------------
-// The export service calls readRunnerBundle() which reads agent-runner/dist/index.js.
-// helpers.ts computes the path by walking 5 parent directories up from helpers.ts,
-// which resolves to the parent of the repo root (one level above expected). We create
-// the stub at both the correct location and the implementation-resolved location so
-// the export route works in integration tests regardless of whether the ncc bundle
-// has been built.
+// The export service calls readRunnerBundle() which reads agent-runner/dist/index.js
+// relative to the repo root. We ensure a stub exists so export tests pass without
+// requiring a real ncc build.
 
 function repoRoot(): string {
   const thisFile = fileURLToPath(import.meta.url);
@@ -40,32 +37,26 @@ function repoRoot(): string {
 }
 
 const STUB_CONTENTS = '// stub runner bundle for integration tests\n';
-// Correct path (used if helpers.ts path computation is fixed).
 const STUB_BUNDLE_PATH = join(repoRoot(), 'agent-runner', 'dist', 'index.js');
-// Implementation-resolved path: helpers.ts walks 5 dirs up from server/src/modules/ci/
-// landing one level above the repo root (see helpers.ts repoRoot() comment).
-const STUB_BUNDLE_PATH_IMPL = join(repoRoot(), '..', 'agent-runner', 'dist', 'index.js');
-let createdPaths: string[] = [];
+let createdStub = false;
 
 async function ensureStubBundle(): Promise<void> {
   const { existsSync } = await import('node:fs');
-  for (const bundlePath of [STUB_BUNDLE_PATH, STUB_BUNDLE_PATH_IMPL]) {
-    if (!existsSync(bundlePath)) {
-      try {
-        await mkdir(join(bundlePath, '..'), { recursive: true });
-        await writeFile(bundlePath, STUB_CONTENTS);
-        createdPaths.push(bundlePath);
-      } catch {
-        // best-effort; export tests will fail with a descriptive error if missing
-      }
+  if (!existsSync(STUB_BUNDLE_PATH)) {
+    try {
+      await mkdir(join(STUB_BUNDLE_PATH, '..'), { recursive: true });
+      await writeFile(STUB_BUNDLE_PATH, STUB_CONTENTS);
+      createdStub = true;
+    } catch {
+      // best-effort; export tests will fail with a descriptive error if missing
     }
   }
 }
 
 async function cleanupStubBundle(): Promise<void> {
-  for (const p of createdPaths) {
+  if (createdStub) {
     try {
-      await rm(p, { force: true });
+      await rm(STUB_BUNDLE_PATH, { force: true });
     } catch {
       // best-effort
     }

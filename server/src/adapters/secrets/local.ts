@@ -27,8 +27,16 @@ export class LocalSecretsProvider implements SecretsProvider {
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8'));
       if (parsed && typeof parsed === 'object') data = parsed as Record<string, string>;
-    } catch {
-      // Missing or unreadable file → no stored overrides yet.
+    } catch (err) {
+      // Missing file → no stored overrides yet. But a *corrupt* file should
+      // not silently degrade — surface the parse error so the operator can fix it.
+      if (err instanceof SyntaxError) {
+        throw new Error(
+          `Failed to parse secrets file at "${this.filePath}": ${err.message}. ` +
+            'Fix the JSON syntax or delete the file to start fresh.',
+        );
+      }
+      // ENOENT / EACCES / other fs errors → no stored overrides.
     }
     this.cache = data;
     return data;
