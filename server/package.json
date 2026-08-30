@@ -32,11 +32,13 @@
     "graphology": "^0.26.0",
     "graphology-metrics": "^2.4.0",
     "js-tiktoken": "^1.0.21",
+    "libsodium-wrappers": "^0.8.4",
     "octokit": "^4.0.3",
     "openai": "^4.77.0",
     "p-queue": "^8.0.1",
     "postgres": "^3.4.5",
     "simple-git": "^3.27.0",
+    "yaml": "^2.9.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

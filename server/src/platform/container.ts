@@ -14,6 +14,8 @@ import { runBus, type RunBus } from './sse.js';
 import { LocalSecretsProvider } from '../adapters/secrets/local.js';
 import { LocalNoAuthProvider } from '../adapters/auth/local.js';
 import { OctokitGitHubClient } from '../adapters/github/octokit.js';
+import { createOctokitCiProvisioner } from '../adapters/github/ci-provisioner.js';
+import type { CiProvisioner } from '../modules/ci/provisioner.js';
 import { SimpleGitClient } from '../adapters/git/simple-git.js';
 import { RipgrepCodeIndex } from '../adapters/codeindex/ripgrep.js';
 import { OpenAIProvider } from '../adapters/llm/openai.js';
@@ -56,6 +58,8 @@ export interface ContainerOverrides {
   tokenizer?: Tokenizer;
   /** project-context service — tests can inject a pre-built instance. */
   projectContext?: ProjectContextService;
+  /** ci module (Step 7/8) — tests inject a stub CiProvisioner. */
+  ciProvisioner?: CiProvisioner;
 }
 
 export class Container {
@@ -68,6 +72,7 @@ export class Container {
 
   private _git?: GitClient;
   private _github?: GitHubClient;
+  private _ciProvisioner?: CiProvisioner;
   private _codeIndex?: CodeIndex;
   private _embedder?: Embedder;
   private llmCache = new Map<string, LLMProvider>();
@@ -180,6 +185,21 @@ export class Container {
     return this._github;
   }
 
+  /**
+   * CiProvisioner (Step 7/8) — provisions Actions secrets/variables on a
+   * target repo during CI export. Lazily resolves the same GITHUB_TOKEN
+   * used by `github()`, cached separately since it wraps a distinct client
+   * surface (`actions.*` only).
+   */
+  async ciProvisioner(): Promise<CiProvisioner> {
+    if (this.overrides.ciProvisioner) return this.overrides.ciProvisioner;
+    if (this._ciProvisioner) return this._ciProvisioner;
+    const token = await this.secrets.get('GITHUB_TOKEN');
+    if (!token) throw new ConfigError('GITHUB_TOKEN is not configured');
+    this._ciProvisioner = createOctokitCiProvisioner(token);
+    return this._ciProvisioner;
+  }
+
   /** Resolve an LLM provider by id; constructs from the secret key, cached. */
   async llm(id: 'openai' | 'anthropic' | 'openrouter'): Promise<LLMProvider> {
     const injected = this.overrides.llm?.[id];
@@ -235,6 +255,7 @@ export class Container {
   invalidateSecretCaches(): void {
     this.llmCache.clear();
     this._github = undefined;
+    this._ciProvisioner = undefined;
     this._embedder = undefined;
   }
 }

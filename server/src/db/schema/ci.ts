@@ -9,6 +9,8 @@ export const ciInstallations = pgTable('ci_installations', {
   repo: text('repo').notNull(),
   targetType: text('target_type', { enum: ['gha', 'circle', 'jenkins', 'cli'] }).notNull(),
   installedAt: timestamp('installed_at', { withTimezone: true }).defaultNow().notNull(),
+  /** Agent version at install time; used by the CI tab to show which version is deployed. */
+  agentVersion: integer('agent_version'),
 });
 
 export const ciRuns = pgTable('ci_runs', {
@@ -23,4 +25,10 @@ export const ciRuns = pgTable('ci_runs', {
   costUsd: doublePrecision('cost_usd'),
   githubUrl: text('github_url'),
   source: text('source'),
+  /** Commit SHA of the PR head that was reviewed (from ingest artifact). */
+  commitSha: text('commit_sha'),
+  /** Model used for this run (from ingest artifact). */
+  model: text('model'),
+  /** Manifest version (AgentManifest.version) at the time of the run. */
+  manifestVersion: text('manifest_version'),
 });
