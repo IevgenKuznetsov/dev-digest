@@ -76,7 +76,7 @@ describe('generateWorkflow', () => {
   describe('fork guard (AC-UN5)', () => {
     it('contains the fork if-guard on the job', () => {
       const yaml = generateWorkflow(defaultInput);
-      expect(yaml).toContain('github.event.pull_request.head.repo.fork == false');
+      expect(yaml).toContain('github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name');
     });
 
     it('does NOT use pull_request_target as the trigger event', () => {
@@ -302,7 +302,7 @@ describe('generateWorkflow', () => {
         runnerLabel: ['self-hosted', 'custom'],
         studioUrl: 'https://studio.example.com',
       });
-      expect(yaml).toContain('github.event.pull_request.head.repo.fork == false');
+      expect(yaml).toContain('github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name');
     });
   });
 });
