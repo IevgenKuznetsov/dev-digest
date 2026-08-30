@@ -90,12 +90,11 @@ export function generateWorkflow(input: GenerateWorkflowInput): string {
         // Self-hosted runner (AC-U9) — no GitHub-hosted fallback, no tunnel/relay.
         'runs-on': input.runnerLabel ?? DEFAULT_RUNNER_LABEL,
 
-        // Fork PR guard (AC-UN5): skip this job entirely when the PR head
-        // originates from a fork. Forked PRs have no access to repository
-        // secrets — this guard prevents the job from running AND from
-        // accidentally exposing secrets via a privileged trigger.
+        // Fork PR guard (AC-UN5): skip when the PR comes from a different
+        // repo (external fork). Comparing head vs base full_name handles
+        // repos that are themselves forks — same-repo PRs still run.
         // Do NOT use pull_request_target; use pull_request with this guard.
-        if: '${{ github.event.pull_request.head.repo.fork == false }}',
+        if: '${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}',
 
         steps: [
           {
