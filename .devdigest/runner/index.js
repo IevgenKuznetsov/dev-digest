@@ -20143,6 +20143,8 @@ const CiResultArtifact = objectType({
     agent: stringType(),
     version: stringType().nullish(),
     pr_number: numberType().int().nullish(),
+    /** Runner-reported outcome. Absent in artifacts produced before this field existed. */
+    status: enumType(['succeeded', 'failed', 'no_findings']).nullish(),
 });
 // ===========================================================================
 // Conformance (PRD ↔ PR) — API record (the analysis shape is `Conformance`)
@@ -35459,6 +35461,7 @@ function buildResultArtifact(input) {
         agent: input.agent,
         version: RUNNER_VERSION,
         pr_number: input.prNumber,
+        status: input.status,
     };
     const result = CiResultArtifact.safeParse(candidate);
     if (!result.success) {
@@ -35531,12 +35534,14 @@ async function runCi(deps) {
         const triggered = gateTriggered(outcome.review.findings, manifest.ci_fail_on);
         // 6. Build + write the artifact before posting, so a GitHub-side posting
         //    failure never loses the already-computed, already-grounded result.
+        const runStatus = triggered ? 'failed' : outcome.review.findings.length === 0 ? 'no_findings' : 'succeeded';
         const artifact = buildResultArtifact({
             findings: outcome.review.findings,
             costUsd: outcome.costUsd,
             durationMs,
             agent: manifest.name,
             prNumber: ctx.prNumber,
+            status: runStatus,
         });
         writeFile(deps.resultPath, `${JSON.stringify(artifact, null, 2)}\n`);
         // 7. Post per `post_as` (AC-24).
@@ -35557,9 +35562,26 @@ async function runCi(deps) {
         };
     }
     catch (err) {
-        // Hard-fail (Q5): non-zero exit, nothing posted, no artifact, no synthetic
-        // review skeleton — regardless of which stage above threw.
+        // Hard-fail (Q5): non-zero exit, nothing posted, no synthetic review skeleton —
+        // regardless of which stage above threw.
         const message = err instanceof Error ? err.message : String(err);
+        // Write a sentinel artifact so the ingest step can record this failure.
+        // Uses safe defaults: agent name may be unknown if the manifest never loaded.
+        const rawPr = Number(deps.env.PR_NUMBER);
+        const sentinel = {
+            findings_count: 0,
+            cost_usd: null,
+            agent: 'unknown',
+            version: RUNNER_VERSION,
+            pr_number: Number.isFinite(rawPr) ? rawPr : null,
+            status: 'failed',
+        };
+        try {
+            writeFile(deps.resultPath, `${JSON.stringify(sentinel, null, 2)}\n`);
+        }
+        catch {
+            // Best-effort — if the FS write fails (e.g. disk full) we still exit non-zero.
+        }
         return { exitCode: 1, artifact: null, posted: null, error: message };
     }
 }

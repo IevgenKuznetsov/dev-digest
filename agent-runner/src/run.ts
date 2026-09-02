@@ -6,7 +6,7 @@ import { loadSkillBodies } from './skills.js';
 import { resolvePrContext, type CiEnv } from './context.js';
 import { parseUnifiedDiff, stripIgnoredFiles } from './diff.js';
 import { fetchPrDiff, postGithubReview, postPrComment, type FetchLike } from './github.js';
-import { buildResultArtifact } from './artifact.js';
+import { buildResultArtifact, RUNNER_VERSION } from './artifact.js';
 import { RunnerError } from './errors.js';
 
 /**
@@ -139,12 +139,14 @@ export async function runCi(deps: RunCiDeps): Promise<RunCiResult> {
 
     // 6. Build + write the artifact before posting, so a GitHub-side posting
     //    failure never loses the already-computed, already-grounded result.
+    const runStatus = triggered ? 'failed' : outcome.review.findings.length === 0 ? 'no_findings' : 'succeeded';
     const artifact = buildResultArtifact({
       findings: outcome.review.findings,
       costUsd: outcome.costUsd,
       durationMs,
       agent: manifest.name,
       prNumber: ctx.prNumber,
+      status: runStatus,
     });
     writeFile(deps.resultPath, `${JSON.stringify(artifact, null, 2)}\n`);
 
@@ -165,9 +167,27 @@ export async function runCi(deps: RunCiDeps): Promise<RunCiResult> {
       gateTriggered: triggered,
     };
   } catch (err) {
-    // Hard-fail (Q5): non-zero exit, nothing posted, no artifact, no synthetic
-    // review skeleton — regardless of which stage above threw.
+    // Hard-fail (Q5): non-zero exit, nothing posted, no synthetic review skeleton —
+    // regardless of which stage above threw.
     const message = err instanceof Error ? err.message : String(err);
+
+    // Write a sentinel artifact so the ingest step can record this failure.
+    // Uses safe defaults: agent name may be unknown if the manifest never loaded.
+    const rawPr = Number(deps.env.PR_NUMBER);
+    const sentinel: CiResultArtifact = {
+      findings_count: 0,
+      cost_usd: null,
+      agent: 'unknown',
+      version: RUNNER_VERSION,
+      pr_number: Number.isFinite(rawPr) ? rawPr : null,
+      status: 'failed',
+    };
+    try {
+      writeFile(deps.resultPath, `${JSON.stringify(sentinel, null, 2)}\n`);
+    } catch {
+      // Best-effort — if the FS write fails (e.g. disk full) we still exit non-zero.
+    }
+
     return { exitCode: 1, artifact: null, posted: null, error: message };
   }
 }

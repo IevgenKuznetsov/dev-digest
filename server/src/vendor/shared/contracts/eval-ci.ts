@@ -235,6 +235,8 @@ export const CiResultArtifact = z.object({
   agent: z.string(),
   version: z.string().nullish(),
   pr_number: z.number().int().nullish(),
+  /** Runner-reported outcome. Absent in artifacts produced before this field existed. */
+  status: z.enum(['succeeded', 'failed', 'no_findings']).nullish(),
 });
 export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
 

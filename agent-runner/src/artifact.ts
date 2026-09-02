@@ -11,6 +11,8 @@ export interface BuildResultArtifactInput {
   durationMs: number;
   agent: string;
   prNumber: number;
+  /** Gate outcome: 'failed' when ci_fail_on triggered, 'no_findings' when count=0, else 'succeeded'. */
+  status: 'succeeded' | 'failed' | 'no_findings';
 }
 
 function severityCounts(findings: Finding[]): { critical: number; warning: number; suggestion: number } {
@@ -41,6 +43,7 @@ export function buildResultArtifact(input: BuildResultArtifactInput): CiResultAr
     agent: input.agent,
     version: RUNNER_VERSION,
     pr_number: input.prNumber,
+    status: input.status,
   };
   const result = CiResultArtifact.safeParse(candidate);
   if (!result.success) {

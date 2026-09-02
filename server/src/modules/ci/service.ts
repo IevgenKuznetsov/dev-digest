@@ -341,7 +341,7 @@ export class CiService {
       commitSha,
       model: null,
       manifestVersion: artifact.version ?? null,
-      status: null,
+      status: artifact.status ?? null,
       findingsCount: artifact.findings_count,
       costUsd: artifact.cost_usd ?? null,
       githubUrl: null,
